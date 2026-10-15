@@ -49,7 +49,8 @@ AgentPey, y al revés.
 **Cómo se relacionan los workspaces (fijado en T1).** El workspace de pnpm cubre solo `apps/*` y
 `packages/*`. `contracts/stellar` (Cargo) y `contracts/evm` (Foundry) son workspaces aparte, sin
 `package.json`: pnpm no los ve. Desde la raíz los llaman los scripts `contracts:test:stellar` y
-`contracts:test:evm`, que no forman parte de `pnpm check`; en CI corren como jobs aparte. El
+`contracts:test:evm`, que no forman parte de `pnpm check`. En CI corren como jobs aparte: el de
+Soroban desde T1 y el de Foundry desde T2, cuando se instala la herramienta. El
 único puente entre TypeScript y los contratos es `deployments/*.json` (direcciones, parámetros
 del constructor y la interfaz exportada por el despliegue), leído con zod por los adaptadores.
 Ningún paquete TS importa archivos de `contracts/`. Biome hace cumplir que `packages/core` solo

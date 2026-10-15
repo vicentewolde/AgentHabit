@@ -43,7 +43,8 @@ export function isAgentHabitError(value: unknown): value is AgentHabitError {
     "code" in value &&
     typeof value.code === "string" &&
     "details" in value &&
-    typeof value.details === "object"
+    typeof value.details === "object" &&
+    value.details !== null
   );
 }
 

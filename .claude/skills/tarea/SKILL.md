@@ -16,7 +16,7 @@ Estado del repositorio:
 
 ## 1. Preparar
 - Lee `docs/ESTADO.md` y la sección **$ARGUMENTS** del spec de la fase actual (`docs/fase-<n>-…/SPEC.md`).
-- El spec debe estar **Aprobado**. Si no, detente y sugiere `/fase-plan`.
+- El spec debe estar **Aprobado**. Si no, detente y sugiere `/fase-plan`. Excepción: la Fase 0 no tiene `SPEC.md`; su spec es `docs/fase-0-fundamentos/claude-code-mensaje-inicial.md`, sección "Fase 0", aprobado por el usuario al empezar.
 - Verifica que sus dependencias estén ✅ en ESTADO. Si no, detente y avisa.
 - Si hay **cambios** sin commitear que no son de esta tarea, detente y pregunta.
 - Confirma rama y HEAD, y crea la rama explícitamente desde `origin/main`:

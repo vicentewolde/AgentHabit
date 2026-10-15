@@ -6,9 +6,8 @@ build/
 coverage/
 
 # Environment and secrets
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 
 # Contracts: build output (Cargo and Foundry)
 contracts/stellar/target/

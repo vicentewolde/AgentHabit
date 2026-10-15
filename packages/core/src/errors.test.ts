@@ -47,4 +47,14 @@ describe("hasErrorCode", () => {
     expect(isAgentHabitError(fromOtherCopy)).toBe(true);
     expect(hasErrorCode(fromOtherCopy, "ConfigError")).toBe(true);
   });
+
+  it("rejects a look-alike whose details are null", () => {
+    const lookAlike = Object.assign(new Error("x"), {
+      name: "AgentHabitError",
+      code: "ConfigError",
+      details: null,
+    });
+
+    expect(isAgentHabitError(lookAlike)).toBe(false);
+  });
 });

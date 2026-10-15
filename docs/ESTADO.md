@@ -27,6 +27,9 @@ el repo en GitHub y abrir el primer PR. Luego `/tarea T2`.
 - Aprobar `gh repo create vicentewolde/AgentHabit --public` y el primer PR (cierra T1).
 - El primer PR necesita una rama `main` en GitHub como base: decidir cómo nace (ver
   [bitácora](fase-0-fundamentos/BITACORA.md), T1).
+- Abrir una sesión de Claude Code en `~/dev/AgentHabit`, escribir `/estado` y pegar la salida en
+  [evidencia/T1.md](fase-0-fundamentos/evidencia/T1.md): la prueba real del segundo "Hecho
+  cuando" de T1 (en la sesión de T1 se simuló a mano).
 
 ## Notas
 
@@ -34,5 +37,9 @@ el repo en GitHub y abrir el primer PR. Luego `/tarea T2`.
   `soroban-sdk`, forge-std y OpenZeppelin (versiones que se resuelven en vivo), y los scripts
   `bootstrap.ts`, `deploy-stellar.ts`, `deploy-avalanche.ts` y `scripts/lib/`. Los
   `deployments/*.json` los escribe T7.
+- **"Hecho cuando" que T2 suma por la revisión de T1:** (1) el job de `forge test` en CI, con su
+  action fijada por SHA; (2) `cargo build --release --target wasm32v1-none` compila el contrato
+  de Soroban, en local y en CI. Hoy el contrato vacío pasa `cargo test` pero no compila para la
+  red: falta `#[panic_handler]`, que llega con `soroban-sdk`.
 - Foundry no está instalado en la Mac todavía: `pnpm run contracts:test:evm` falla hasta T2.
 - Node local es 26.9; el proyecto fija 22 (`.nvmrc`, `P-5`). `pnpm check` pasa en 26.

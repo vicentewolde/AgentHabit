@@ -57,6 +57,17 @@ de `pnpm check`. El único puente entre los dos mundos será `deployments/*.json
 `soroban-sdk`, la versión de solc, forge-std, OpenZeppelin y el job de Foundry en CI. También los
 scripts (`bootstrap.ts`, `deploy-*.ts`, `scripts/lib/`). Los `deployments/*.json` los escribe T7.
 
-**Pendiente para cerrar T1.** El usuario aprueba crear el repo en GitHub y el primer PR. Como el
-repo nace vacío, el PR necesita una rama `main` de base: la propuesta es un commit raíz vacío en
-`main`, con el OK del usuario, como única excepción a la regla 7, y T1 encima de él.
+**Revisión (`/revisar`).** Sin bloqueantes: cinco importantes y cuatro sugerencias, todas
+corregidas en un commit `fix` sobre la misma rama a pedido del usuario. Lo principal: los
+permisos dejaban pasar un despliegue o `settle --live` escrito como `pnpm --filter …`, y el
+bloqueo de lectura de `.env*` era parcial; ahora ambos preguntan o se niegan. Dos documentos
+decían que los tests de Foundry ya corren en CI; ahora dicen que llegan en T2, que además suma
+compilar el contrato de Soroban para la red.
+
+**Pendiente para cerrar T1.**
+- El usuario aprueba crear el repo en GitHub y el primer PR. Como el repo nace vacío, el PR
+  necesita una rama `main` de base: la propuesta es un commit raíz vacío en `main`, con el OK del
+  usuario, como única excepción a la regla 7, y T1 encima de él (los SHA de la rama cambian; el
+  final se anota en la evidencia).
+- Correr `/estado` de verdad en una sesión abierta en `~/dev/AgentHabit` y anotar su salida en
+  la evidencia.

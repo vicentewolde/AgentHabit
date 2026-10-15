@@ -140,8 +140,8 @@ pnpm run contracts:test:evm
 ```
 
 `pnpm check` = `biome check . && tsc -b && vitest run`; no toca la red. Los tests de contratos
-corren en CI y en las tareas que tocan contratos. `contracts:test:evm` necesita Foundry, que se
-instala en T2.
+corren en las tareas que tocan contratos y en CI, como jobs aparte: Soroban desde T1 y Foundry
+desde T2. `contracts:test:evm` necesita Foundry, que se instala en T2.
 
 `rustup` viene de Homebrew y es keg-only; hace falta
 `export PATH="/opt/homebrew/opt/rustup/bin:$PATH"` para que exista `cargo`.
