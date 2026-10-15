@@ -10,21 +10,19 @@
 **Fase en curso:** Fase 0 · Fundamentos. Su spec es el
 [mensaje inicial](fase-0-fundamentos/claude-code-mensaje-inicial.md), sección "Fase 0".
 
-**Última tarea terminada:** ninguna todavía. T1 está en revisión.
-**Siguiente paso:** que la CI del [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1)
-pase y el usuario autorice el merge (fast-forward a `main`). Luego `/tarea T2`.
+**Última tarea terminada:** T1 Repo y método ([PR #1](https://github.com/vicentewolde/AgentHabit/pull/1), mergeado el 15-oct por fast-forward).
+**Siguiente paso:** `/tarea T2` — Herramientas y claves.
 
 ## Progreso de la Fase 0
 
 | Tarea | Estado | Rama / PR |
 |---|---|---|
-| T1 Repo y método | 👀 en revisión: estructura compilando, método, registros; `pnpm check` en verde; `/revisar` sin bloqueantes, hallazgos corregidos ([evidencia](fase-0-fundamentos/evidencia/T1.md)) | [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1) |
+| T1 Repo y método | ✅ terminada: estructura compilando, método, registros; `pnpm check` y `cargo test` en verde en CI; `/revisar` sin bloqueantes, hallazgos corregidos ([evidencia](fase-0-fundamentos/evidencia/T1.md)) | [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1), mergeado |
 | T2 Herramientas y claves | ⏳ pendiente | |
 | T3 `/fase-plan 1` | ⏳ pendiente | |
 
 ## Pendientes del usuario
 
-- Autorizar el merge del [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1) (cierra T1).
 - Abrir una sesión de Claude Code en `~/dev/AgentHabit`, escribir `/estado` y pegar la salida en
   [evidencia/T1.md](fase-0-fundamentos/evidencia/T1.md): la prueba real del segundo "Hecho
   cuando" de T1 (en la sesión de T1 se simuló a mano).

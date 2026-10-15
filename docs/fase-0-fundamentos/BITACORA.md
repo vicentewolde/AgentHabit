@@ -12,15 +12,15 @@
 
 ## Estado actual
 
-**Fecha:** 2026-10-15 · T1 en revisión: repo público en
+**Fecha:** 2026-10-15 · **T1 cerrada:** repo público en
 [vicentewolde/AgentHabit](https://github.com/vicentewolde/AgentHabit), [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1)
-abierto. Siguiente: merge con el OK del usuario, y después T2.
+mergeado por fast-forward con la CI en verde. Siguiente: T2.
 
 ## Progreso
 
 | Tarea | Estado |
 |---|---|
-| T1 Repo y método | 👀 en revisión |
+| T1 Repo y método | ✅ terminada |
 | T2 Herramientas y claves | ⏳ pendiente |
 | T3 `/fase-plan 1` | ⏳ pendiente |
 
@@ -66,8 +66,8 @@ decían que los tests de Foundry ya corren en CI; ahora dicen que llegan en T2, 
 compilar el contrato de Soroban para la red.
 
 **Pendiente para cerrar T1.**
-- Merge del [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1), con el OK del usuario. El
-  repo ya está creado y `main` nació como un commit raíz vacío (`f74bc38`), la excepción a la
-  regla 7 que aprobó el usuario.
+- ~~Merge del PR #1~~: hecho el 15-oct, fast-forward de `main` a `a52bf3c` con la CI en verde
+  (`pnpm check` y `cargo test`). `main` nació como un commit raíz vacío (`f74bc38`), la excepción
+  a la regla 7 que aprobó el usuario.
 - Correr `/estado` de verdad en una sesión abierta en `~/dev/AgentHabit` y anotar su salida en
   la evidencia.
