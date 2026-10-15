@@ -1,0 +1,31 @@
+# Dependencies and builds
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+coverage/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Contracts: build output (Cargo and Foundry)
+contracts/stellar/target/
+contracts/evm/out/
+contracts/evm/cache/
+contracts/evm/broadcast/
+
+# Local data (real Strava data never goes to git)
+tmp/
+*.log
+
+# System and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Claude Code: personal settings
+.claude/settings.local.json

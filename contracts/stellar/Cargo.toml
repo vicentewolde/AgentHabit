@@ -1,0 +1,19 @@
+# Cargo workspace for the Stellar side (P-3). Rooted here, not at the repo root:
+# `contracts/` holds no package.json and is invisible to pnpm (P-2).
+[workspace]
+resolver = "2"
+members = ["commitment"]
+
+# soroban-sdk is resolved live in T2 (`cargo add`, checked against the network's
+# protocol via getVersionInfo), not written from memory.
+[workspace.dependencies]
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true

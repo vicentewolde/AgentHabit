@@ -1,0 +1,8 @@
+# Foundry project for the Avalanche side (P-3). No package.json: pnpm never sees it (P-2).
+# The solc version, forge-std and OpenZeppelin are resolved live in T2, not written from memory.
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]

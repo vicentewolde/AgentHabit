@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["*.ts"],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/config" },
+    { "path": "./packages/db" },
+    { "path": "./packages/strava" },
+    { "path": "./packages/chain-stellar" },
+    { "path": "./packages/chain-avalanche" },
+    { "path": "./apps/api" },
+    { "path": "./apps/settler" },
+    { "path": "./apps/web" }
+  ]
+}

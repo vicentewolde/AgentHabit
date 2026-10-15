@@ -1,0 +1,60 @@
+# AgentHabit CI (T1). No secrets: tests touch no network, no Neon and no Strava.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read-only: the workflow never writes to the repository.
+permissions:
+  contents: read
+
+# A new push cancels the previous run of the same branch or PR.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: pnpm check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Actions pinned by commit SHA (version in the comment): supply chain. Same pins as AgentSales.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # pnpm version from `packageManager` in the root package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      # Node from .nvmrc (P-5) and the pnpm store cache.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # Fails if the lockfile is out of date; applies pnpm's release-age policy.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint, types and tests
+        run: pnpm check
+
+  contracts-stellar:
+    name: cargo test (Soroban)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # rustup is preinstalled on the runner and reads contracts/stellar/rust-toolchain.toml
+      # (stable + wasm32v1-none) on the first cargo call.
+      - name: Contract tests
+        working-directory: contracts/stellar
+        run: cargo test
+
+  # The Foundry job (forge test) lands with T2, together with the toolchain and its pinned action.

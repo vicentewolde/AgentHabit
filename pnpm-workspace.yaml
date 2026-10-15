@@ -1,0 +1,6 @@
+# The pnpm workspace covers the TypeScript side only (P-2).
+# `contracts/stellar` (Cargo) and `contracts/evm` (Foundry) are separate workspaces with no
+# package.json: pnpm never sees them. The only bridge is `deployments/*.json`.
+packages:
+  - "apps/*"
+  - "packages/*"

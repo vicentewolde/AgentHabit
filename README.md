@@ -1,0 +1,77 @@
+# AgentHabit
+
+Put money on your running goal. You lock 20–50 USDC in a contract and set a weekly distance
+goal; Strava verifies your runs. Hit the goal and you get everything back. Miss it and the money
+stays locked in the contract forever: nobody collects it, not the platform and not other users.
+
+- **Two chains, same behaviour:** Stellar (Soroban) and Avalanche (Solidity), one adapter per
+  chain over a shared domain core.
+- **No custody:** the contracts have no admin, no withdrawal and no upgrade.
+- **The verifier's failure never costs the user:** if the oracle does not settle in time, anyone
+  can return the deposit to its owner.
+- **Testnet only** (Stellar testnet and Avalanche Fuji) until Phase 2.
+
+Status: Phase 0 (foundations). See [ROADMAP.md](ROADMAP.md). Project docs are in Spanish under
+[docs/](docs/).
+
+## Layout
+
+```
+apps/        web · api · settler (the oracle's weekly job)
+packages/    core · config · db · strava · chain-stellar · chain-avalanche
+contracts/   stellar/ (Cargo workspace) · evm/ (Foundry project)
+deployments/ the only bridge between TypeScript and the contracts
+scripts/     bootstrap and deploy scripts
+docs/        roadmap state, decisions, phase specs and logs (Spanish)
+```
+
+The pnpm workspace covers `apps/*` and `packages/*` only. The contract workspaces have no
+`package.json`; they are run from the root with dedicated scripts.
+
+## Requirements
+
+- Node 22 (`.nvmrc`) and pnpm 11.24.0 (`packageManager`)
+- Rust stable with the `wasm32v1-none` target (`contracts/stellar/rust-toolchain.toml`)
+- Foundry, for the EVM contract (installed in T2)
+
+## Commands
+
+Install dependencies:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+Lint, typecheck and test (no network):
+
+```bash
+pnpm check
+```
+
+Format and fix lint issues:
+
+```bash
+pnpm format
+```
+
+Soroban contract tests:
+
+```bash
+pnpm run contracts:test:stellar
+```
+
+EVM contract tests:
+
+```bash
+pnpm run contracts:test:evm
+```
+
+## Configuration
+
+Copy `.env.example` to `.env.local` and follow its comments. Keys are generated into
+`.env.local` by `pnpm run bootstrap` (T2), never typed into argv. Settlement runs in
+`SETTLE_MODE=dry-run` by default: it computes and prints, but does not sign.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
