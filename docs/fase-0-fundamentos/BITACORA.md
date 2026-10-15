@@ -12,8 +12,9 @@
 
 ## Estado actual
 
-**Fecha:** 2026-10-15 · T1 en revisión, en la rama `cc/t1-repo-y-metodo`, sin publicar en GitHub.
-Siguiente: `/revisar`, crear el repo con el OK del usuario, primer PR, y después T2.
+**Fecha:** 2026-10-15 · T1 en revisión: repo público en
+[vicentewolde/AgentHabit](https://github.com/vicentewolde/AgentHabit), [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1)
+abierto. Siguiente: merge con el OK del usuario, y después T2.
 
 ## Progreso
 
@@ -65,9 +66,8 @@ decían que los tests de Foundry ya corren en CI; ahora dicen que llegan en T2, 
 compilar el contrato de Soroban para la red.
 
 **Pendiente para cerrar T1.**
-- El usuario aprueba crear el repo en GitHub y el primer PR. Como el repo nace vacío, el PR
-  necesita una rama `main` de base: la propuesta es un commit raíz vacío en `main`, con el OK del
-  usuario, como única excepción a la regla 7, y T1 encima de él (los SHA de la rama cambian; el
-  final se anota en la evidencia).
+- Merge del [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1), con el OK del usuario. El
+  repo ya está creado y `main` nació como un commit raíz vacío (`f74bc38`), la excepción a la
+  regla 7 que aprobó el usuario.
 - Correr `/estado` de verdad en una sesión abierta en `~/dev/AgentHabit` y anotar su salida en
   la evidencia.
