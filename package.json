@@ -13,10 +13,10 @@
     "format": "biome check --write .",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "contracts:test:stellar": "cargo test --manifest-path contracts/stellar/Cargo.toml",
+    "contracts:test:stellar": "cd contracts/stellar && cargo test --locked",
     "contracts:test:evm": "forge test --root contracts/evm",
     "contracts:test": "pnpm run contracts:test:stellar && pnpm run contracts:test:evm",
-    "contracts:build:stellar": "stellar contract build --locked --manifest-path contracts/stellar/Cargo.toml",
+    "contracts:build:stellar": "cd contracts/stellar && stellar contract build --locked",
     "contracts:build:evm": "forge build --root contracts/evm",
     "bootstrap": "tsx --conditions=@agenthabit/source scripts/bootstrap.ts"
   },

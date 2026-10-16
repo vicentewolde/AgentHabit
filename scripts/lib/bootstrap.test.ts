@@ -1,12 +1,13 @@
-import { copyFile, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { parseEnv } from "@agenthabit/config";
 import { AgentHabitError, hasErrorCode } from "@agenthabit/core";
+import { Keypair } from "@stellar/stellar-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { type BootstrapOptions, guardSecrets, runBootstrap } from "./bootstrap.js";
+import { type BootstrapOptions, guardSecrets, runBootstrap, runBootstrapCli } from "./bootstrap.js";
 import { parseEnv as parseEnvFile } from "./env-file.js";
 import { ROLES } from "./keys.js";
 import type { StellarTestnet } from "./stellar-testnet.js";
@@ -38,7 +39,6 @@ class FakeTestnet implements StellarTestnet {
   }
   async addUsdcTrustline(secret: string): Promise<string> {
     this.calls.push("addUsdcTrustline");
-    const { Keypair } = await import("@stellar/stellar-sdk");
     this.trustlines.add(Keypair.fromSecret(secret).publicKey());
     return "ab".repeat(32);
   }
@@ -112,7 +112,7 @@ describe("runBootstrap", () => {
 
   it("fills only the missing keys and keeps the user's own lines and values", async () => {
     const paths = await workspace();
-    const ownSecret = (await import("@stellar/stellar-sdk")).Keypair.random().secret();
+    const ownSecret = Keypair.random().secret();
     const example = await readFile(paths.examplePath, "utf8");
     await writeFile(
       paths.envPath,
@@ -192,6 +192,127 @@ describe("runBootstrap", () => {
     expect(output).toContain("https://core.app/tools/testnet-faucet/");
     expect(output.match(/0x[0-9a-fA-F]{40}\b/g)?.length).toBeGreaterThanOrEqual(6);
     expect(output.match(/\bG[A-Z2-7]{55}\b/g)?.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("runBootstrap never loses an existing key", () => {
+  it("stops on a set key followed by a pasted empty duplicate, leaving the file as it was", async () => {
+    const paths = await workspace();
+    const realOracle = Keypair.random().secret();
+    const example = await readFile(paths.examplePath, "utf8");
+    const before = `${example.replace(
+      "STELLAR_ORACLE_SECRET=",
+      `STELLAR_ORACLE_SECRET=${realOracle}`,
+    )}\n# pasted again\nSTELLAR_ORACLE_SECRET=\n`;
+    await writeFile(paths.envPath, before);
+    const testnet = new FakeTestnet();
+
+    await expect(runBootstrap(options(paths, testnet, []))).rejects.toSatisfy((error) =>
+      hasErrorCode(error, "ConfigError"),
+    );
+    expect(await readFile(paths.envPath, "utf8")).toBe(before);
+    expect(testnet.calls).toEqual([]);
+  });
+
+  it("stops before writing anything on a seed with a broken checksum", async () => {
+    const paths = await workspace();
+    const seed = Keypair.random().secret();
+    const broken = `${seed.slice(0, -1)}${seed.endsWith("A") ? "B" : "A"}`;
+    const example = await readFile(paths.examplePath, "utf8");
+    const before = example.replace("STELLAR_DEPLOYER_SECRET=", `STELLAR_DEPLOYER_SECRET=${broken}`);
+    await writeFile(paths.envPath, before);
+
+    await expect(runBootstrap(options(paths, new FakeTestnet(), []))).rejects.toSatisfy((error) =>
+      hasErrorCode(error, "ConfigError"),
+    );
+    expect(await readFile(paths.envPath, "utf8")).toBe(before);
+  });
+});
+
+describe("the bootstrap lock", () => {
+  it("refuses to run while another live bootstrap holds the lock", async () => {
+    const paths = await workspace();
+    await writeFile(`${paths.envPath}.lock`, `${process.pid}\n`);
+    const testnet = new FakeTestnet();
+
+    await expect(runBootstrap(options(paths, testnet, []))).rejects.toSatisfy((error) =>
+      hasErrorCode(error, "ConfigError"),
+    );
+    expect(testnet.calls).toEqual([]);
+    expect(await readFile(`${paths.envPath}.lock`, "utf8")).toBe(`${process.pid}\n`);
+  });
+
+  it("takes over a lock left by a bootstrap that died, and removes it when done", async () => {
+    const paths = await workspace();
+    // Far above any real pid on macOS and Linux, so no live process can own it.
+    await writeFile(`${paths.envPath}.lock`, "2147483646\n");
+
+    const report = await runBootstrap(options(paths, new FakeTestnet(), []));
+
+    expect(report.created).toHaveLength(6);
+    expect(await readdir(join(paths.envPath, ".."))).not.toContain(".env.local.lock");
+  });
+});
+
+describe("runBootstrapCli", () => {
+  /** A testnet whose trustline step fails with an error that quotes the signing key. */
+  class LeakyTestnet extends FakeTestnet {
+    constructor(private readonly failure: (secret: string) => unknown) {
+      super();
+    }
+    override async addUsdcTrustline(secret: string): Promise<string> {
+      throw this.failure(secret);
+    }
+  }
+
+  async function runCli(failure: (secret: string) => unknown) {
+    const paths = await workspace();
+    const errors: string[] = [];
+    const code = await runBootstrapCli(options(paths, new LeakyTestnet(failure), []), (line) =>
+      errors.push(line),
+    );
+    return { code, errors, secrets: await secretsIn(paths.envPath) };
+  }
+
+  it("exits 1 and withholds an AgentHabitError whose message quotes a key", async () => {
+    const { code, errors, secrets } = await runCli(
+      (secret) =>
+        new AgentHabitError("NetworkError", `rejected ${secret}`, { cause: new Error(secret) }),
+    );
+
+    expect(code).toBe(1);
+    expect(errors).toEqual(["bootstrap failed. (message withheld: it contained a secret)"]);
+    for (const secret of secrets) {
+      expect(errors.join("\n")).not.toContain(secret);
+    }
+  });
+
+  it("never echoes a dependency's error, even one carrying a key", async () => {
+    const { code, errors } = await runCli((secret) => new Error(`sdk exploded on ${secret}`));
+
+    expect(code).toBe(1);
+    expect(errors).toEqual(["bootstrap failed. unexpected failure"]);
+  });
+
+  it("shows the code and message of an ordinary failure", async () => {
+    const { code, errors } = await runCli(
+      () => new AgentHabitError("NetworkError", "Stellar testnet: could not create the trustline"),
+    );
+
+    expect(code).toBe(1);
+    expect(errors).toEqual([
+      "bootstrap failed. NetworkError: Stellar testnet: could not create the trustline",
+    ]);
+  });
+
+  it("exits 0 when everything is in place", async () => {
+    const paths = await workspace();
+    const errors: string[] = [];
+
+    expect(
+      await runBootstrapCli(options(paths, new FakeTestnet(), []), (l) => errors.push(l)),
+    ).toBe(0);
+    expect(errors).toEqual([]);
   });
 });
 

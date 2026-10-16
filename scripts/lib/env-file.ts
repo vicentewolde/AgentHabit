@@ -1,4 +1,4 @@
-import { chmod, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, readFile, rename, rm, writeFile } from "node:fs/promises";
 
 import { AgentHabitError } from "@agenthabit/core";
 
@@ -18,15 +18,23 @@ function unquote(raw: string): string {
   return quoted ? value.slice(1, -1) : value;
 }
 
+/**
+ * A variable defined twice is rejected, not resolved: with `KEY=real` above a pasted `KEY=`,
+ * "last one wins" would read the key as unset, and filling it in would overwrite the real one.
+ */
 export function parseEnv(contents: string): Map<string, string> {
   const entries = new Map<string, string>();
   for (const line of contents.split("\n")) {
     const match = LINE.exec(line);
     if (match === null || line.trim().startsWith("#")) continue;
     const [, key, rawValue] = match;
-    if (key !== undefined && rawValue !== undefined) {
-      entries.set(key, unquote(rawValue));
+    if (key === undefined || rawValue === undefined) continue;
+    if (entries.has(key)) {
+      throw new AgentHabitError("ConfigError", `${key} is defined more than once; keep one line`, {
+        details: { key },
+      });
     }
+    entries.set(key, unquote(rawValue));
   }
   return entries;
 }
@@ -81,15 +89,18 @@ export async function readEnvFile(path: string): Promise<string | undefined> {
 
 /**
  * Writes owner-only (0600) through a temporary file and a rename, so an interrupted run never
- * leaves a half-written file of keys behind.
+ * leaves a half-written file of keys behind. A failed write removes its temporary copy: a stray
+ * file of keys is a leak waiting to happen, even a git-ignored one.
  */
 export async function writeEnvFile(path: string, contents: string): Promise<void> {
   const temporary = `${path}.${process.pid}.tmp`;
   try {
-    await writeFile(temporary, contents, { mode: 0o600 });
+    // `flag: "wx"` refuses a leftover file, which could carry looser permissions than 0600.
+    await writeFile(temporary, contents, { mode: 0o600, flag: "wx" });
     await rename(temporary, path);
     await chmod(path, 0o600);
   } catch (error) {
+    await rm(temporary, { force: true });
     throw new AgentHabitError("ConfigError", `could not write ${path}`, {
       cause: error,
       details: { path },

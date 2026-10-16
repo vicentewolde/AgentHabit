@@ -169,7 +169,7 @@ Todo se resolvió el 15-oct-2026 contra la fuente, no de memoria:
 |---|---|---|
 | Protocolo de Stellar testnet | 29 (stellar-core 29.0.0) | `getVersionInfo` y `getNetwork` por RPC |
 | `soroban-sdk` | 29.0.1 | `cargo info`: la última estable, que calza con el protocolo 29 |
-| Rust | 1.98.0 stable + `wasm32v1-none` | `rust-toolchain.toml` (`stable`) |
+| Rust | 1.98.0 + `wasm32v1-none` | fijado en `rust-toolchain.toml` (no `stable`, tras `/revisar`) |
 | `stellar` CLI | 28.1.0 | última release de `stellar/stellar-cli`; `brew upgrade` |
 | Foundry | 1.8.5 | `foundryup` (binarios verificados por atestación) |
 | solc | 0.8.37, `evm_version = "cancun"` | última release estable de `ethereum/solidity` |
@@ -190,9 +190,14 @@ Todo se resolvió el 15-oct-2026 contra la fuente, no de memoria:
   Pectra (ACP-131; guía "Deploy a Smart Contract" de docs.avax.network, consultada el 15-oct), y
   solc 0.8.30 o posterior compila para Pectra por defecto.
 
+**Fijada de verdad.** rustup elige el toolchain según la carpeta desde la que se corre `cargo`, no
+según el `--manifest-path`. Por eso `contracts:test:stellar` y `contracts:build:stellar` entran
+con `cd` a `contracts/stellar`; desde la raíz usarían el `stable` que haya en la máquina.
+
 **Motivo.** Restricción de `CLAUDE.md`: las versiones no se escriben de memoria y el protocolo
-vivo de Stellar se confirma por RPC. Fijar la versión exacta en un solo lugar (`Cargo.toml`,
-`foundry.toml`, `package.json` y `ci.yml`) hace que local y CI compilen lo mismo.
+vivo de Stellar se confirma por RPC. Fijar la versión exacta en un solo lugar
+(`rust-toolchain.toml`, `Cargo.toml`, `foundry.toml`, `package.json` y `ci.yml`) hace que local y
+CI compilen el mismo wasm, que es el que T7 va a desplegar.
 
 **Alternativa descartada:** `soroban-sdk` 28 para conservar el `cargo build` directo (queda un
 protocolo atrás de la red, sin ganar nada). Para `cancun`: dejar el `evm_version` por defecto de
@@ -223,11 +228,26 @@ traer OpenZeppelin por npm: pnpm no ve `contracts/` (`P-2`).
 
 - **Claves.** Se generan en el proceso con `@stellar/stellar-sdk` y `viem`: deployer, oráculo y
   usuario de prueba, por cadena. Se escriben en `.env.local` con permisos `0600`, mediante un
-  archivo temporal y un rename. Una clave que ya existe nunca se reemplaza, y una mal formada
-  detiene el bootstrap con `ConfigError` sin tocar el archivo. El script no recibe argumentos.
+  archivo temporal y un rename; si la escritura falla, la copia temporal se borra. El script no
+  recibe argumentos.
+- **Una clave que ya existe nunca se reemplaza.** El bootstrap se detiene con `ConfigError` sin
+  tocar el archivo en tres casos:
+  - una variable definida dos veces, porque con "gana la última" un `KEY=` pegado debajo de la
+    clave real la hacía ver vacía;
+  - una clave mal formada;
+  - una clave con la forma correcta pero inválida: el checksum de StrKey en Stellar, el rango
+    1 ≤ n < orden de secp256k1 en EVM.
+
+  Todas las direcciones se derivan antes de escribir.
+- **Una corrida a la vez.** Un lock `.env.local.lock` con el pid evita que dos bootstraps en
+  paralelo generen claves distintas para las mismas variables. Si el lock lo dejó una corrida que
+  murió, se retoma.
 - **Salida.** Solo direcciones públicas. Cada línea pasa por un guardián que detiene la corrida
   con `SecretLeak` si contiene un secreto, también sin el `0x` o en otra capitalización. Ante un
-  error se imprime solo el `code` y el mensaje propio, nunca la causa de una dependencia.
+  error, `runBootstrapCli` imprime solo el `code` y el mensaje propio, nunca la causa de una
+  dependencia. Esa línea también pasa por el guardián, armado con las claves del archivo, y si
+  contiene una se omite. El error de viem para una clave fuera de rango cita la clave en decimal,
+  así que nunca se encadena como `cause`.
 - **Red.** Antes de mover nada verifica con `getNetwork` que la RPC sirve testnet. Fondea con
   Friendbot solo las cuentas que no existen y crea la trustline de USDC solo para el usuario de
   prueba, y solo si no existe. En Fuji no toca la red: imprime las direcciones para los faucets

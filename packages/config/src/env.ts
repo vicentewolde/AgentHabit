@@ -1,4 +1,5 @@
 import { AgentHabitError } from "@agenthabit/core";
+import { StrKey } from "@stellar/stellar-sdk";
 import { z } from "zod";
 
 /**
@@ -8,15 +9,27 @@ import { z } from "zod";
  * Strava and database variables are added by T9, when something reads them.
  */
 
-/** A Stellar secret seed: `S` followed by 55 base32 characters (StrKey). */
-export const StellarSecretSchema = z.string().regex(/^S[A-Z2-7]{55}$/);
+/**
+ * A Stellar secret seed, checksum included (StrKey): a seed with one character changed has the
+ * right shape but no keypair, and would only fail later, deep inside the SDK.
+ */
+export const StellarSecretSchema = z
+  .string()
+  .refine((value) => StrKey.isValidEd25519SecretSeed(value));
 
 const EVM_PRIVATE_KEY = /^0x[0-9a-fA-F]{64}$/;
+/** Order of secp256k1: a private key is an integer in [1, n). */
+const SECP256K1_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
-/** An EVM private key: `0x` followed by 32 bytes of hex, typed the way viem expects it. */
-export const EvmPrivateKeySchema = z.custom<`0x${string}`>(
-  (value) => typeof value === "string" && EVM_PRIVATE_KEY.test(value),
-);
+/**
+ * An EVM private key: `0x` and 32 bytes of hex that form a valid secp256k1 scalar, typed the way
+ * viem expects it. Checked here because viem's own error for an out-of-range key quotes the key.
+ */
+export const EvmPrivateKeySchema = z.custom<`0x${string}`>((value) => {
+  if (typeof value !== "string" || !EVM_PRIVATE_KEY.test(value)) return false;
+  const scalar = BigInt(value);
+  return scalar >= 1n && scalar < SECP256K1_ORDER;
+});
 
 /** `dry-run` computes and prints; `live` signs. Live needs the user's explicit instruction. */
 export const SettleModeSchema = z.enum(["dry-run", "live"]);

@@ -1,5 +1,12 @@
-import { type Env, parseEnv } from "@agenthabit/config";
-import { AgentHabitError } from "@agenthabit/core";
+import { open, rm } from "node:fs/promises";
+
+import {
+  AVALANCHE_KEY_VARIABLES,
+  type Env,
+  parseEnv,
+  STELLAR_KEY_VARIABLES,
+} from "@agenthabit/config";
+import { AgentHabitError, isAgentHabitError } from "@agenthabit/core";
 
 import { fillEnvValues, parseEnv as parseEnvFile, readEnvFile, writeEnvFile } from "./env-file.js";
 import {
@@ -70,13 +77,109 @@ async function loadEnvFile(options: BootstrapOptions): Promise<{ contents: strin
   return { contents, env: parseEnv(Object.fromEntries(parseEnvFile(contents))) };
 }
 
-function required<T>(value: T | undefined, variable: string): T {
-  if (value === undefined) {
-    throw new AgentHabitError("ConfigError", `${variable} is still missing after key generation`, {
-      details: { variable },
-    });
+/** The identity that gets the USDC trustline and the faucet instructions. */
+const TEST_USER = "STELLAR_TEST_USER_SECRET";
+
+interface Identity {
+  readonly role: (typeof ROLES)[number];
+  readonly stellarSecret: string;
+  readonly stellar: string;
+  readonly avalanche: string;
+  readonly isNew: boolean;
+}
+
+/**
+ * Derives every public address up front, before anything is written: a key that cannot become a
+ * keypair stops the run here, naming its variable. The SDK's error is dropped, not chained,
+ * because viem's quotes the key itself.
+ */
+function deriveIdentities(env: Env, created: readonly string[]): Identity[] {
+  const derive = <T>(variable: string, run: () => T): T => {
+    try {
+      return run();
+    } catch {
+      throw new AgentHabitError("ConfigError", `${variable} is not a usable key`, {
+        details: { variable },
+      });
+    }
+  };
+  return ROLES.map((role) => {
+    const stellarSecret = env[role.stellar];
+    const avalancheKey = env[role.avalanche];
+    if (stellarSecret === undefined || avalancheKey === undefined) {
+      const variable = stellarSecret === undefined ? role.stellar : role.avalanche;
+      throw new AgentHabitError(
+        "ConfigError",
+        `${variable} is still missing after key generation`,
+        {
+          details: { variable },
+        },
+      );
+    }
+    return {
+      role,
+      stellarSecret,
+      stellar: derive(role.stellar, () => stellarAddress(stellarSecret)),
+      avalanche: derive(role.avalanche, () => evmAddress(avalancheKey)),
+      isNew: created.includes(role.stellar) || created.includes(role.avalanche),
+    };
+  });
+}
+
+/** True while `pid` names a live process. EPERM means alive but someone else's. */
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "EPERM";
   }
-  return value;
+}
+
+/** Creates the lock, or reports the pid of the bootstrap that already holds it. */
+async function tryLock(lockPath: string): Promise<number | undefined> {
+  try {
+    const handle = await open(lockPath, "wx", 0o600);
+    await handle.writeFile(`${process.pid}\n`);
+    await handle.close();
+    return undefined;
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) {
+      throw new AgentHabitError("ConfigError", `could not create ${lockPath}`, {
+        cause: error,
+        details: { lockPath },
+      });
+    }
+    const holder = Number.parseInt((await readEnvFile(lockPath)) ?? "", 10);
+    return Number.isInteger(holder) ? holder : -1;
+  }
+}
+
+/**
+ * One bootstrap at a time per key file. Two runs in parallel would each generate keys for the
+ * same empty variables, and the last rename would silently discard the other run's keys, which
+ * may already have been funded and printed. A lock left by a run that died (Ctrl+C during the
+ * Friendbot wait, say) names a pid that no longer exists, and is taken over.
+ */
+async function withLock<T>(envPath: string, run: () => Promise<T>): Promise<T> {
+  const lockPath = `${envPath}.lock`;
+  let holder = await tryLock(lockPath);
+  if (holder !== undefined && holder > 0 && !isAlive(holder)) {
+    await rm(lockPath, { force: true });
+    holder = await tryLock(lockPath);
+  }
+  if (holder !== undefined) {
+    throw new AgentHabitError(
+      "ConfigError",
+      `another bootstrap (pid ${holder}) holds ${lockPath}; wait for it, or delete the file if it is not running`,
+      { details: { lockPath, holder } },
+    );
+  }
+  try {
+    return await run();
+  } finally {
+    await rm(lockPath, { force: true });
+  }
 }
 
 /**
@@ -84,30 +187,23 @@ function required<T>(value: T | undefined, variable: string): T {
  * adds the test user's USDC trustline if it is not there, and prints what to do by hand on Fuji.
  * Safe to run any number of times: an existing key, account or trustline is never touched.
  */
-export async function runBootstrap(options: BootstrapOptions): Promise<BootstrapReport> {
+export function runBootstrap(options: BootstrapOptions): Promise<BootstrapReport> {
+  return withLock(options.envPath, () => bootstrap(options));
+}
+
+async function bootstrap(options: BootstrapOptions): Promise<BootstrapReport> {
   const loaded = await loadEnvFile(options);
   const fresh = missingKeys(loaded.env, options.keys ?? randomKeys);
   const created = [...fresh.keys()];
 
-  let env = loaded.env;
+  const contents = fresh.size > 0 ? fillEnvValues(loaded.contents, fresh) : loaded.contents;
+  const env = fresh.size > 0 ? parseEnv(Object.fromEntries(parseEnvFile(contents))) : loaded.env;
+  const identities = deriveIdentities(env, created);
   if (fresh.size > 0) {
-    const contents = fillEnvValues(loaded.contents, fresh);
-    env = parseEnv(Object.fromEntries(parseEnvFile(contents)));
     await writeEnvFile(options.envPath, contents);
   }
 
   const print = guardSecrets(secretsOf(env), options.print);
-  const identities = ROLES.map((role) => {
-    const stellarSecret = required(env[role.stellar], role.stellar);
-    const avalancheKey = required(env[role.avalanche], role.avalanche);
-    return {
-      role,
-      stellarSecret,
-      stellar: stellarAddress(stellarSecret),
-      avalanche: evmAddress(avalancheKey),
-      isNew: created.includes(role.stellar) || created.includes(role.avalanche),
-    };
-  });
 
   print("AgentHabit bootstrap: Stellar testnet and Avalanche Fuji");
   print(`Keys in ${options.envPath} (secrets are never printed):`);
@@ -132,7 +228,12 @@ export async function runBootstrap(options: BootstrapOptions): Promise<Bootstrap
     print(`  ${identity.role.name.padEnd(9)} account funded with Friendbot`);
   }
 
-  const testUser = required(identities.at(-1), "STELLAR_TEST_USER_SECRET");
+  const testUser = identities.find((identity) => identity.role.stellar === TEST_USER);
+  if (testUser === undefined) {
+    throw new AgentHabitError("ConfigError", `no role uses ${TEST_USER}`, {
+      details: { variable: TEST_USER },
+    });
+  }
   let trustline: BootstrapReport["trustline"] = "already in place";
   if (await stellar.hasUsdcTrustline(testUser.stellar)) {
     print("  test user USDC trustline already in place");
@@ -152,4 +253,60 @@ export async function runBootstrap(options: BootstrapOptions): Promise<Bootstrap
   print(`       Avalanche Fuji  ${testUser.avalanche}`);
 
   return { created, funded, trustline };
+}
+
+const KEY_VARIABLES: ReadonlySet<string> = new Set([
+  ...STELLAR_KEY_VARIABLES,
+  ...AVALANCHE_KEY_VARIABLES,
+]);
+
+/**
+ * Every key value in the key file, duplicates included, read line by line without validation:
+ * this runs after a failure, possibly one caused by a file that does not parse.
+ */
+async function keysInEnvFile(envPath: string): Promise<string[]> {
+  try {
+    const contents = (await readEnvFile(envPath)) ?? "";
+    return contents.split("\n").flatMap((line) => {
+      const separator = line.indexOf("=");
+      const variable = line
+        .slice(0, separator)
+        .replace(/^\s*export\s+/, "")
+        .trim();
+      const value = line
+        .slice(separator + 1)
+        .trim()
+        .replace(/^["']|["']$/g, "");
+      return separator > 0 && KEY_VARIABLES.has(variable) && value !== "" ? [value] : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The command-line wrapper: runs the bootstrap and turns any failure into one line on
+ * `printError`. Only an AgentHabitError's code and message are shown, never a cause; and even
+ * that line goes through the secret guard, built from every key in the key file, so an error
+ * that quotes a key is withheld rather than printed. Returns the process exit code.
+ */
+export async function runBootstrapCli(
+  options: BootstrapOptions,
+  printError: (line: string) => void,
+): Promise<number> {
+  try {
+    await runBootstrap(options);
+    return 0;
+  } catch (error) {
+    const summary = isAgentHabitError(error)
+      ? `${error.code}: ${error.message}`
+      : "unexpected failure";
+    const guarded = guardSecrets(await keysInEnvFile(options.envPath), printError);
+    try {
+      guarded(`bootstrap failed. ${summary}`);
+    } catch {
+      printError("bootstrap failed. (message withheld: it contained a secret)");
+    }
+    return 1;
+  }
 }

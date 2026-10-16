@@ -12,9 +12,10 @@
 
 ## Estado actual
 
-**Fecha:** 2026-10-15 · **T2 en revisión** en la rama `cc/t2-herramientas-y-claves`: herramientas
+**Fecha:** 2026-10-15 · **T2 revisada** en la rama `cc/t2-herramientas-y-claves`: herramientas
 instaladas y fijadas, los dos contratos vacíos compilan y pasan sus tests, y `pnpm run bootstrap`
-dejó las claves de testnet listas. Siguiente: `/revisar`.
+dejó las claves de testnet listas. Los hallazgos de `/revisar` están corregidos. Siguiente: push y
+PR, con el OK del usuario.
 
 ## Progreso
 
@@ -104,8 +105,21 @@ Se puede correr las veces que se quiera: lo que ya existe no se toca.
 - `P-9`: dependencias de Foundry como git submodules fijados a un tag.
 - `P-10`: cómo el bootstrap maneja claves, salida y red.
 
+**Revisión (`/revisar`).** El subagente `revisor` y la revisión propia encontraron un bloqueante,
+tres importantes y siete sugerencias. Todo se corrigió en un commit `fix` sobre la misma rama.
+- **El bloqueante:** si `.env.local` tenía una clave real y más abajo la misma variable vacía (por
+  ejemplo, al volver a pegar una sección de `.env.example`), el bootstrap creía que faltaba y la
+  pisaba. Era justo lo que T2 promete no hacer. Ahora una variable repetida detiene todo sin tocar
+  el archivo.
+- **Validación de claves:** también se revisan el checksum y el rango, y se detiene antes de
+  escribir.
+- **Corridas en paralelo:** no se puede correr dos bootstraps a la vez.
+- **Errores:** ningún mensaje de error puede mostrar una clave, aunque una dependencia la incluya.
+- **Rust:** la versión quedó fijada de verdad. Los scripts no la respetaban porque corrían `cargo`
+  desde la raíz.
+
 **Pendiente para cerrar T2.**
-- `/revisar`, push y PR con el OK del usuario. La CI de los contratos se ve recién en el PR.
+- Push y PR con el OK del usuario. La CI de los contratos se ve recién en el PR.
 - Agregar Foundry al `PATH` de la terminal: el instalador no lo hizo solo.
 - Fuji: pegar las tres direcciones en el faucet de AVAX, y la del usuario de prueba en el de USDC
   de Circle. Esto no bloquea T3: hace falta en T7, para desplegar.

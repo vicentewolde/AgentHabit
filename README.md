@@ -31,10 +31,22 @@ The pnpm workspace covers `apps/*` and `packages/*` only. The contract workspace
 ## Requirements
 
 - Node 22 (`.nvmrc`) and pnpm 11.24.0 (`packageManager`)
-- Rust stable with the `wasm32v1-none` target (`contracts/stellar/rust-toolchain.toml`)
-- `stellar` CLI 28.1.0, which builds the Soroban contract (`brew install stellar-cli`)
-- Foundry 1.8.5, for the EVM contract (`foundryup --install v1.8.5`, binaries in
-  `~/.foundry/bin`)
+- Rust 1.98.0 with the `wasm32v1-none` target, pinned in `contracts/stellar/rust-toolchain.toml`
+  (rustup installs it on the first `cargo` call inside `contracts/stellar`)
+- `stellar` CLI 28.1.0, which builds the Soroban contract
+- Foundry 1.8.5, for the EVM contract (binaries in `~/.foundry/bin`)
+
+Install the pinned `stellar` CLI (Homebrew always installs the latest one instead):
+
+```bash
+cargo install --locked stellar-cli --version 28.1.0
+```
+
+Install the pinned Foundry, once `foundryup` is installed from https://getfoundry.sh:
+
+```bash
+foundryup --install v1.8.5
+```
 
 The EVM dependencies (forge-std, OpenZeppelin) are git submodules pinned to release tags. After
 cloning:

@@ -1,9 +1,13 @@
-import { hasErrorCode } from "@agenthabit/core";
+import { hasErrorCode, isAgentHabitError } from "@agenthabit/core";
+import { Keypair } from "@stellar/stellar-sdk";
 import { describe, expect, it } from "vitest";
 import { parseEnv } from "./env.js";
 
-const STELLAR_SECRET = `S${"A".repeat(55)}`;
+const STELLAR_SECRET = Keypair.random().secret();
 const EVM_KEY = `0x${"ab".repeat(32)}`;
+/** secp256k1's order n, as viem prints it: valid keys are 1 to n - 1. */
+const ORDER = 115792089237316195423570985008687907852837564279074904382605163141518161494337n;
+const evmHex = (scalar: bigint) => `0x${scalar.toString(16).padStart(64, "0")}`;
 
 const BASE = {
   STELLAR_RPC_URL: "https://soroban-testnet.stellar.org",
@@ -74,13 +78,36 @@ describe("parseEnv", () => {
     );
 
     expect(hasErrorCode(error, "ConfigError")).toBe(true);
-    const serialised = JSON.stringify({
-      message: (error as Error).message,
-      details: (error as { details: unknown }).details,
-    });
+    const serialised = JSON.stringify(
+      isAgentHabitError(error) ? { message: error.message, details: error.details } : null,
+    );
     expect(serialised).toContain("STELLAR_TEST_USER_SECRET");
     expect(serialised).toContain("AVALANCHE_TEST_USER_PRIVATE_KEY");
     expect(serialised).not.toContain(malformed);
     expect(serialised).not.toContain(evmMalformed);
+  });
+
+  it("rejects a Stellar seed with the right shape but a broken checksum", () => {
+    // Flip the last character: still `S` + 55 base32 characters, no longer a seed.
+    const last = STELLAR_SECRET.at(-1) === "A" ? "B" : "A";
+    const broken = `${STELLAR_SECRET.slice(0, -1)}${last}`;
+    const error = captureError(() => parseEnv({ ...BASE, STELLAR_ORACLE_SECRET: broken }));
+
+    expect(hasErrorCode(error, "ConfigError")).toBe(true);
+    expect(isAgentHabitError(error) && error.details).toEqual({
+      variables: ["STELLAR_ORACLE_SECRET"],
+    });
+  });
+
+  it("accepts EVM keys from 1 to n - 1 and rejects 0 and n and above", () => {
+    for (const valid of [1n, ORDER - 1n]) {
+      expect(parseEnv({ ...BASE, AVALANCHE_ORACLE_PRIVATE_KEY: evmHex(valid) })).toBeDefined();
+    }
+    for (const invalid of [0n, ORDER, 2n ** 256n - 1n]) {
+      const error = captureError(() =>
+        parseEnv({ ...BASE, AVALANCHE_ORACLE_PRIVATE_KEY: evmHex(invalid) }),
+      );
+      expect(hasErrorCode(error, "ConfigError")).toBe(true);
+    }
   });
 });
