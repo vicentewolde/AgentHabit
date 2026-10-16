@@ -5,7 +5,7 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["*.ts"],
+  "include": ["*.ts", "scripts/**/*.ts"],
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/config" },

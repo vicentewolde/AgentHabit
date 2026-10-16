@@ -11,31 +11,34 @@
 [mensaje inicial](fase-0-fundamentos/claude-code-mensaje-inicial.md), sección "Fase 0".
 
 **Última tarea terminada:** T1 Repo y método ([PR #1](https://github.com/vicentewolde/AgentHabit/pull/1), mergeado el 15-oct por fast-forward).
-**Siguiente paso:** `/tarea T2` — Herramientas y claves.
+**En revisión:** T2 Herramientas y claves, en la rama `cc/t2-herramientas-y-claves`.
+**Siguiente paso:** `/revisar` sobre T2; después, push y PR con tu OK.
 
 ## Progreso de la Fase 0
 
 | Tarea | Estado | Rama / PR |
 |---|---|---|
 | T1 Repo y método | ✅ terminada: estructura compilando, método, registros; `pnpm check` y `cargo test` en verde en CI; `/revisar` sin bloqueantes, hallazgos corregidos ([evidencia](fase-0-fundamentos/evidencia/T1.md)) | [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1), mergeado |
-| T2 Herramientas y claves | ⏳ pendiente | |
+| T2 Herramientas y claves | 👀 en revisión: herramientas fijadas (`P-8`, `P-9`), contratos vacíos que compilan y testean, `pnpm run bootstrap` corrido contra testnet ([evidencia](fase-0-fundamentos/evidencia/T2.md)) | `cc/t2-herramientas-y-claves` |
 | T3 `/fase-plan 1` | ⏳ pendiente | |
 
 ## Pendientes del usuario
 
-- Abrir una sesión de Claude Code en `~/dev/AgentHabit`, escribir `/estado` y pegar la salida en
-  [evidencia/T1.md](fase-0-fundamentos/evidencia/T1.md): la prueba real del segundo "Hecho
-  cuando" de T1 (en la sesión de T1 se simuló a mano).
+- Agregar Foundry al `PATH`, por ejemplo con
+  `echo 'export PATH="$PATH:$HOME/.foundry/bin"' >> ~/.zshrc`, porque el instalador no lo hizo.
+- **Para T7, no bloquea T3:** pedir AVAX de prueba para las tres direcciones de Fuji y USDC de
+  prueba para el usuario de prueba, a mano. Las direcciones están al final de la salida de
+  `pnpm run bootstrap`.
+- Pegar una salida real de `/estado` en [evidencia/T1.md](fase-0-fundamentos/evidencia/T1.md):
+  ya se corrió en la sesión de T2.
 
 ## Notas
 
-- **Dejado para T2, a propósito:** el job de Foundry en CI, `foundry.toml` con versión de solc,
-  `soroban-sdk`, forge-std y OpenZeppelin (versiones que se resuelven en vivo), y los scripts
-  `bootstrap.ts`, `deploy-stellar.ts`, `deploy-avalanche.ts` y `scripts/lib/`. Los
-  `deployments/*.json` los escribe T7.
-- **"Hecho cuando" que T2 suma por la revisión de T1:** (1) el job de `forge test` en CI, con su
-  action fijada por SHA; (2) `cargo build --release --target wasm32v1-none` compila el contrato
-  de Soroban, en local y en CI. Hoy el contrato vacío pasa `cargo test` pero no compila para la
-  red: falta `#[panic_handler]`, que llega con `soroban-sdk`.
-- Foundry no está instalado en la Mac todavía: `pnpm run contracts:test:evm` falla hasta T2.
+- **Desvío del plan (`P-8`):** el contrato de Soroban se compila con `stellar contract build`
+  (`pnpm run contracts:build:stellar`), porque `soroban-sdk` 29 no acepta
+  `cargo build --release --target wasm32v1-none`. CI hace lo mismo.
+- Los jobs nuevos de CI (`stellar contract build` y `forge test`) todavía no corrieron en GitHub:
+  se ven en el PR de T2.
+- Friendbot creó cuentas el 15-oct sin responder la petición. El bootstrap confía en el ledger, no
+  en Friendbot (`P-10`).
 - Node local es 26.9; el proyecto fija 22 (`.nvmrc`, `P-5`). `pnpm check` pasa en 26.

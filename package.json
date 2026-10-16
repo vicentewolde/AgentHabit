@@ -15,12 +15,21 @@
     "test": "vitest run",
     "contracts:test:stellar": "cargo test --manifest-path contracts/stellar/Cargo.toml",
     "contracts:test:evm": "forge test --root contracts/evm",
-    "contracts:test": "pnpm run contracts:test:stellar && pnpm run contracts:test:evm"
+    "contracts:test": "pnpm run contracts:test:stellar && pnpm run contracts:test:evm",
+    "contracts:build:stellar": "stellar contract build --locked --manifest-path contracts/stellar/Cargo.toml",
+    "contracts:build:evm": "forge build --root contracts/evm",
+    "bootstrap": "tsx --conditions=@agenthabit/source scripts/bootstrap.ts"
   },
   "devDependencies": {
+    "@agenthabit/config": "workspace:*",
+    "@agenthabit/core": "workspace:*",
     "@biomejs/biome": "2.5.15",
+    "@stellar/stellar-sdk": "17.2.1",
     "@types/node": "22.20.5",
+    "tsx": "4.23.15",
     "typescript": "7.0.2",
-    "vitest": "5.0.4"
+    "viem": "2.57.7",
+    "vitest": "5.0.4",
+    "zod": "4.6.7"
   }
 }

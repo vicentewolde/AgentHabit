@@ -157,3 +157,94 @@ externos.
 **Alternativa descartada:** WalletConnect. Suma un relay de terceros, una cuenta de proyecto y
 dependencias con scripts de instalación, para usuarios que en el MVP usan una extensión de
 escritorio.
+
+---
+
+### P-8 · Herramientas y versiones de la Fase 0, resueltas en vivo · `Vigente`
+**Fecha:** 2026-10-15 (T2)
+
+Todo se resolvió el 15-oct-2026 contra la fuente, no de memoria:
+
+| Pieza | Versión | Cómo se resolvió |
+|---|---|---|
+| Protocolo de Stellar testnet | 29 (stellar-core 29.0.0) | `getVersionInfo` y `getNetwork` por RPC |
+| `soroban-sdk` | 29.0.1 | `cargo info`: la última estable, que calza con el protocolo 29 |
+| Rust | 1.98.0 stable + `wasm32v1-none` | `rust-toolchain.toml` (`stable`) |
+| `stellar` CLI | 28.1.0 | última release de `stellar/stellar-cli`; `brew upgrade` |
+| Foundry | 1.8.5 | `foundryup` (binarios verificados por atestación) |
+| solc | 0.8.37, `evm_version = "cancun"` | última release estable de `ethereum/solidity` |
+| forge-std | v1.17.0 (`f3dae6e`) | `forge install` (ver `P-9`) |
+| OpenZeppelin Contracts | v5.7.0 (`cab1993`) | `forge install` (ver `P-9`) |
+| `@stellar/stellar-sdk` · `viem` · `zod` · `tsx` | 17.2.1 · 2.57.7 · 4.6.7 · 4.23.15 | `pnpm add`, fijadas exactas como en `P-5` |
+| Node | se queda en 22 (`P-5`) | T2 no encontró razón para cambiarlo |
+
+**Dos consecuencias que cambian lo que decía el plan:**
+
+- **El contrato de Soroban se compila con `stellar contract build`, no con
+  `cargo build --release --target wasm32v1-none`.** `soroban-sdk` 29 rechaza el `cargo build`
+  directo ("soroban-sdk requires stellar-cli v25.2.0+ to build a contract"), porque el CLI aplica
+  al wasm un paso que cargo no hace. El "Hecho cuando" heredado de la revisión de T1 se cumple con
+  el comando nuevo: `pnpm run contracts:build:stellar` en local y un paso del job de CI, con la
+  action oficial `stellar/stellar-cli` fijada por SHA.
+- **`evm_version` se fija a mano en `cancun`.** La C-Chain de Avalanche corre Cancun y todavía no
+  Pectra (ACP-131; guía "Deploy a Smart Contract" de docs.avax.network, consultada el 15-oct), y
+  solc 0.8.30 o posterior compila para Pectra por defecto.
+
+**Motivo.** Restricción de `CLAUDE.md`: las versiones no se escriben de memoria y el protocolo
+vivo de Stellar se confirma por RPC. Fijar la versión exacta en un solo lugar (`Cargo.toml`,
+`foundry.toml`, `package.json` y `ci.yml`) hace que local y CI compilen lo mismo.
+
+**Alternativa descartada:** `soroban-sdk` 28 para conservar el `cargo build` directo (queda un
+protocolo atrás de la red, sin ganar nada). Para `cancun`: dejar el `evm_version` por defecto de
+solc, que generaría bytecode con opcodes que la C-Chain no ejecuta.
+
+---
+
+### P-9 · Dependencias de Foundry como git submodules fijados a un tag · `Vigente`
+**Fecha:** 2026-10-15 (T2)
+
+forge-std y OpenZeppelin viven en `contracts/evm/lib/` como git submodules, cada uno en el commit
+de su tag de release. `.gitmodules` está en la raíz y `contracts/evm/foundry.lock` registra el tag
+y el commit de cada uno. El job de CI hace checkout con `submodules: true`, sin recursión: los
+submodules anidados de OpenZeppelin solo sirven para sus propios tests.
+
+**Motivo.** Es lo estándar de Foundry: el SHA exacto queda en el repo y se puede revisar en un
+diff, y no suma un registro de paquetes a la cadena de suministro del contrato que custodia
+fondos.
+
+**Alternativa descartada:** Soldeer, el gestor de paquetes de Foundry. Deja menos ruido en git,
+pero agrega un registro de terceros y es menos conocido por los revisores. También se descartó
+traer OpenZeppelin por npm: pnpm no ve `contracts/` (`P-2`).
+
+---
+
+### P-10 · `pnpm run bootstrap`: claves solo en `.env.local` y la red como única verdad · `Vigente`
+**Fecha:** 2026-10-15 (T2)
+
+- **Claves.** Se generan en el proceso con `@stellar/stellar-sdk` y `viem`: deployer, oráculo y
+  usuario de prueba, por cadena. Se escriben en `.env.local` con permisos `0600`, mediante un
+  archivo temporal y un rename. Una clave que ya existe nunca se reemplaza, y una mal formada
+  detiene el bootstrap con `ConfigError` sin tocar el archivo. El script no recibe argumentos.
+- **Salida.** Solo direcciones públicas. Cada línea pasa por un guardián que detiene la corrida
+  con `SecretLeak` si contiene un secreto, también sin el `0x` o en otra capitalización. Ante un
+  error se imprime solo el `code` y el mensaje propio, nunca la causa de una dependencia.
+- **Red.** Antes de mover nada verifica con `getNetwork` que la RPC sirve testnet. Fondea con
+  Friendbot solo las cuentas que no existen y crea la trustline de USDC solo para el usuario de
+  prueba, y solo si no existe. En Fuji no toca la red: imprime las direcciones para los faucets
+  manuales.
+- **Friendbot no se cree en su respuesta.** Tras pedir los fondos, el bootstrap espera a ver la
+  cuenta en el ledger. El 15-oct Friendbot creó las cuentas y luego dejó la conexión abierta unos
+  cinco minutos sin responder, y `fundAddress` del SDK consulta la transacción una sola vez, antes
+  de que la RPC la vea, así que daba por fallida una cuenta ya creada.
+- **Ejecución.** `tsx --conditions=@agenthabit/source`, como AgentSales, con `esbuild: false` en
+  `allowBuilds`.
+
+**Motivo.** Criterios de `CLAUDE.md`: las claves nunca pasan por argv ni por logs, y un test lo
+verifica. Comprobar el estado antes de actuar hace que el script se pueda repetir. Fiarse del
+ledger y no de un servicio auxiliar hace que una segunda corrida arregle lo que la primera dejó a
+medias.
+
+**Alternativa descartada:** `stellar keys generate` y `stellar keys fund` del CLI. Guardan las
+claves en la configuración del CLI, fuera de `.env.local`, y moverlas obliga a pasar el secreto
+por un comando. También se descartó `rpc.Server.fundAddress` del SDK, por la carrera descrita
+arriba.

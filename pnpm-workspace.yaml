@@ -4,3 +4,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Each build script is approved one by one, with its reason (CLAUDE.md, rule 10).
+allowBuilds:
+  # esbuild (through tsx) only verifies its binary in postinstall; the binary arrives as a
+  # per-platform optional dependency, so its script never needs to run. Same as AgentSales.
+  esbuild: false

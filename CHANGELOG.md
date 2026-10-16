@@ -13,3 +13,9 @@ Cada tag se crea solo con permiso del usuario.
   `/tarea`, `/revisar`, `/fase-plan` y `/fase-cerrar`; los subagentes `revisor`, `arquitecto` e
   `integraciones`; los permisos del proyecto; y los registros (`ROADMAP.md`, `docs/ESTADO.md`,
   `docs/DECISIONES.md` con P-1 a P-7).
+- **Herramientas y claves de testnet (T2):** `pnpm run bootstrap` crea las claves de deployer,
+  oráculo y usuario de prueba de Stellar y Avalanche en `.env.local`, sin mostrarlas nunca, y se
+  puede repetir sin pisar nada. Fondea las cuentas de Stellar testnet con Friendbot, crea la
+  trustline de USDC del usuario de prueba e imprime las direcciones de Fuji para los faucets. Los
+  contratos vacíos de las dos cadenas compilan y se prueban en local y en CI
+  (`pnpm run contracts:build:stellar`, `forge test`), con versiones fijadas.

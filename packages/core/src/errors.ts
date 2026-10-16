@@ -7,7 +7,11 @@
  */
 export type AgentHabitErrorCode =
   /** Local configuration is missing, malformed or internally inconsistent. */
-  "ConfigError";
+  | "ConfigError"
+  /** A network service (RPC, Friendbot) failed or answered something unexpected. */
+  | "NetworkError"
+  /** An output line was about to carry a secret; it is never written. */
+  | "SecretLeak";
 
 /** Structured, non-secret context attached to an error for logs and tests. */
 export type AgentHabitErrorDetails = Readonly<Record<string, unknown>>;

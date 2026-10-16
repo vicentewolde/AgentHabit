@@ -48,7 +48,11 @@
       "Bash(stellar contract upload*)",
       "Bash(forge script *)",
       "Bash(forge create*)",
-      "Bash(cast send*)"
+      "Bash(cast send*)",
+      "Bash(pnpm bootstrap*)",
+      "Bash(pnpm run bootstrap*)",
+      "Bash(forge install*)",
+      "Bash(forge update*)"
     ],
     "deny": [
       "Read(**/.env)",

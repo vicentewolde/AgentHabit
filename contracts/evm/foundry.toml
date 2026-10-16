@@ -1,8 +1,18 @@
 # Foundry project for the Avalanche side (P-3). No package.json: pnpm never sees it (P-2).
-# The solc version, forge-std and OpenZeppelin are resolved live in T2, not written from memory.
+# Versions resolved live in T2 (P-8): solc 0.8.37 is the newest stable release (2026-09-10).
+# forge-std and OpenZeppelin are git submodules pinned to release tags (P-9); `foundry.lock`
+# records the tag and commit of each one.
 [profile.default]
 src = "src"
 test = "test"
 script = "script"
 out = "out"
 libs = ["lib"]
+solc_version = "0.8.37"
+# The C-Chain runs Cancun and not Pectra (ACP-131; docs.avax.network "Deploy a Smart Contract",
+# checked 2026-10-15). solc >= 0.8.30 defaults to Pectra, so the target is pinned by hand.
+evm_version = "cancun"
+remappings = [
+  "forge-std/=lib/forge-std/src/",
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+]

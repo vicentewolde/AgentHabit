@@ -32,7 +32,16 @@ The pnpm workspace covers `apps/*` and `packages/*` only. The contract workspace
 
 - Node 22 (`.nvmrc`) and pnpm 11.24.0 (`packageManager`)
 - Rust stable with the `wasm32v1-none` target (`contracts/stellar/rust-toolchain.toml`)
-- Foundry, for the EVM contract (installed in T2)
+- `stellar` CLI 28.1.0, which builds the Soroban contract (`brew install stellar-cli`)
+- Foundry 1.8.5, for the EVM contract (`foundryup --install v1.8.5`, binaries in
+  `~/.foundry/bin`)
+
+The EVM dependencies (forge-std, OpenZeppelin) are git submodules pinned to release tags. After
+cloning:
+
+```bash
+git submodule update --init
+```
 
 ## Commands
 
@@ -60,16 +69,32 @@ Soroban contract tests:
 pnpm run contracts:test:stellar
 ```
 
+Build the Soroban contract for the network (`soroban-sdk` 29 only builds through the CLI):
+
+```bash
+pnpm run contracts:build:stellar
+```
+
 EVM contract tests:
 
 ```bash
 pnpm run contracts:test:evm
 ```
 
+Testnet keys, Friendbot and the USDC trustline (touches Stellar testnet; safe to run again):
+
+```bash
+pnpm run bootstrap
+```
+
+It writes the deployer, oracle and test-user keys for both chains into `.env.local` (mode
+`0600`), never replacing a key that exists, and prints only public addresses. On Fuji it touches
+nothing: it prints the addresses to paste into the AVAX and Circle USDC faucets by hand.
+
 ## Configuration
 
-Copy `.env.example` to `.env.local` and follow its comments. Keys are generated into
-`.env.local` by `pnpm run bootstrap` (T2), never typed into argv. Settlement runs in
+`pnpm run bootstrap` creates `.env.local` from `.env.example` on its first run and fills in the
+keys; follow the comments for the rest. Keys are never typed into argv. Settlement runs in
 `SETTLE_MODE=dry-run` by default: it computes and prints, but does not sign.
 
 ## License

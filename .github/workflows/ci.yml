@@ -1,4 +1,5 @@
-# AgentHabit CI (T1). No secrets: tests touch no network, no Neon and no Strava.
+# AgentHabit CI (T1; contract jobs completed in T2). No secrets: tests touch no network, no
+# Neon and no Strava.
 name: CI
 
 on:
@@ -55,6 +56,36 @@ jobs:
       # (stable + wasm32v1-none) on the first cargo call.
       - name: Contract tests
         working-directory: contracts/stellar
-        run: cargo test
+        run: cargo test --locked
 
-  # The Foundry job (forge test) lands with T2, together with the toolchain and its pinned action.
+      # soroban-sdk 29 refuses a plain `cargo build` for wasm: only `stellar contract build` (CLI
+      # >= 25.2) can build a deployable contract (P-8). The action derives the CLI version from its
+      # ref, which is a SHA here, so the version is passed explicitly and must match the pin.
+      - uses: stellar/stellar-cli@c0f4d0da891bbf214c08b8c5035ae6db80e9a3bd # v28.1.0
+        with:
+          version: 28.1.0
+
+      - name: Build the contract for the network (wasm32v1-none)
+        working-directory: contracts/stellar
+        run: stellar contract build --locked
+
+  contracts-evm:
+    name: forge test (Avalanche)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # forge-std and OpenZeppelin are git submodules pinned to release tags (P-9). Their own
+      # nested submodules only serve their test suites, so the checkout is not recursive.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: true
+
+      # Same Foundry release as the local toolchain (P-8).
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: v1.8.5
+
+      - name: Contract tests
+        working-directory: contracts/evm
+        run: forge test

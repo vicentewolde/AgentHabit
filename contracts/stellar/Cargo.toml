@@ -4,9 +4,10 @@
 resolver = "2"
 members = ["commitment"]
 
-# soroban-sdk is resolved live in T2 (`cargo add`, checked against the network's
-# protocol via getVersionInfo), not written from memory.
 [workspace.dependencies]
+# Resolved live in T2, not assumed (P-8): testnet runs protocol 29 (getVersionInfo on
+# 2026-10-15, stellar-core 29.0.0) and 29.0.1 is the newest stable soroban-sdk on crates.io.
+soroban-sdk = "29.0.1"
 
 [profile.release]
 opt-level = "z"
