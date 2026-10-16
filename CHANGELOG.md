@@ -9,6 +9,8 @@ Cada tag se crea solo con permiso del usuario.
 ### Cambiado
 - **README para la hackatón de Avalanche:** el README explica el problema, cómo funciona el
   compromiso (con un diagrama), por qué Avalanche, la arquitectura y el avance real del proyecto.
+- **Ficha de la hackatón Vinny:** qué pide la entrega (con plazo y requisitos supuestos), qué está
+  listo y qué falta.
 
 ## [0.0.1] - 2026-10-16
 

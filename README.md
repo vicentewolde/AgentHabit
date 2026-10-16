@@ -14,6 +14,9 @@ stays locked in the contract forever: nobody collects it, not the platform and n
 Status: Phase 1 (MVP on testnet); Phase 0 closed at `v0.0.1`. See [ROADMAP.md](ROADMAP.md).
 Project docs are in Spanish under [docs/](docs/).
 
+**Hackathon:** submitted to the Vinny hackathon (Avalanche). The submission checklist is in
+[docs/HACKATON-VINNY.md](docs/HACKATON-VINNY.md) (Spanish).
+
 ## The problem
 
 Most people who set a running goal drop it within weeks. Commitment devices with money at stake

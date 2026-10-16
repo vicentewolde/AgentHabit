@@ -42,8 +42,9 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
 
 ## Notas
 
-- **Hackatón de Avalanche (16-oct):** se entrega este mismo repo. El README tiene una sección para jueces
-  (problema, cómo funciona, por qué Avalanche, arquitectura y avance). Sin código nuevo.
+- **Hackatón Vinny (Avalanche):** se entrega este mismo repo, con el README para jueces del PR #9. Plazo y
+  requisitos son supuestos (el usuario solo dio el nombre): ficha y faltantes en
+  [HACKATON-VINNY.md](HACKATON-VINNY.md). Lo que falta es el contrato en Fuji (T4 + despliegue de T6) y el video.
 - **Calendario de la Fase 1:** Stellar testnet se reinicia el 16-dic-2026. La semana real de 7 días tiene que
   liquidarse antes, o hay que redesplegar (spec, sección 8).
 - **Antes de la Fase 3:** consultar a developers@strava.com si el producto calza con los términos de la API (spec,
