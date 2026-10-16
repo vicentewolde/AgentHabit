@@ -12,17 +12,16 @@
 
 ## Estado actual
 
-**Fecha:** 2026-10-15 · **T2 revisada** en la rama `cc/t2-herramientas-y-claves`: herramientas
-instaladas y fijadas, los dos contratos vacíos compilan y pasan sus tests, y `pnpm run bootstrap`
-dejó las claves de testnet listas. Los hallazgos de `/revisar` están corregidos. Siguiente: push y
-PR, con el OK del usuario.
+**Fecha:** 2026-10-16 · **T2 cerrada:** [PR #3](https://github.com/vicentewolde/AgentHabit/pull/3)
+mergeado por fast-forward con la CI en verde, incluidos los jobs nuevos de los contratos.
+Siguiente: T3, `/fase-plan 1`.
 
 ## Progreso
 
 | Tarea | Estado |
 |---|---|
 | T1 Repo y método | ✅ terminada |
-| T2 Herramientas y claves | 👀 en revisión |
+| T2 Herramientas y claves | ✅ terminada |
 | T3 `/fase-plan 1` | ⏳ pendiente |
 
 ---
@@ -118,8 +117,12 @@ tres importantes y siete sugerencias. Todo se corrigió en un commit `fix` sobre
 - **Rust:** la versión quedó fijada de verdad. Los scripts no la respetaban porque corrían `cargo`
   desde la raíz.
 
-**Pendiente para cerrar T2.**
-- Push y PR con el OK del usuario. La CI de los contratos se ve recién en el PR.
+**Cierre.** Merge del [PR #3](https://github.com/vicentewolde/AgentHabit/pull/3) el 16-oct, por
+fast-forward de `main` a `5b8e13d`. Los tres jobs de CI pasaron. El de Soroban verificó la
+atestación del CLI de Stellar sin permisos extra y compiló el mismo wasm que la Mac
+(`0e69f92b…`): local y CI construyen lo mismo.
+
+**Quedan del lado del usuario, sin bloquear T3.**
 - Agregar Foundry al `PATH` de la terminal: el instalador no lo hizo solo.
 - Fuji: pegar las tres direcciones en el faucet de AVAX, y la del usuario de prueba en el de USDC
   de Circle. Esto no bloquea T3: hace falta en T7, para desplegar.
