@@ -72,6 +72,12 @@ Responde al usuario, en este orden:
 Y detente ahí. No empieces otra tarea.
 
 ## Merge (después de `/revisar`, con el OK del usuario)
+La tarea se cierra **dentro de su propio PR**: no hay un PR de cierre aparte (`P-11`).
 1. `git push -u origin <rama>` y `gh pr create`, con un cuerpo que enlace la tarea del spec.
-2. Con el OK del usuario para el merge: fast-forward a `main`. Antes de pushear `main`, lista `git log origin/main..main` y confirma que cada commit es de esta tarea y está aprobado.
-3. Borra la rama y marca la tarea ✅ en `docs/ESTADO.md`.
+2. Con el OK del usuario para el merge y la CI en verde, agrega en la **misma rama** un commit `docs(...)` que cierre la tarea:
+   - `docs/ESTADO.md`: la tarea ✅ con el enlace al PR, y el siguiente paso;
+   - **Estado actual** y la tabla de la `BITACORA.md` de la fase;
+   - el resultado de la CI del PR en `evidencia/$ARGUMENTS.md`.
+3. Haz push de ese commit y espera la CI otra vez. Si algo falla, corrígelo antes de seguir.
+4. Fast-forward a `main`. Antes de pushear `main`, lista `git log origin/main..main` y confirma que cada commit es de esta tarea y está aprobado, incluido el de cierre.
+5. Borra la rama, en local y en el remoto.

@@ -49,7 +49,8 @@ sigue el mismo ciclo, con las skills de `.claude/skills/`:
 3. `/revisar` — el subagente `revisor` revisa el diff contra el spec, los criterios
    transversales y el perímetro de fondos.
 4. Merge — push, PR y fast-forward a `main`, **solo con el OK explícito del usuario para esa
-   rama**.
+   rama**. La tarea se marca ✅ en un commit de la misma rama, antes del fast-forward: no hay PR de
+   cierre aparte (`P-11`).
 
 `/fase-plan <n>` deja aprobado el spec de una fase y `/fase-cerrar <n>` la cierra. Las
 decisiones van a los `DECISIONES.md`; no hay ADRs aparte (no se usa `/adr`).

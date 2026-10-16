@@ -269,3 +269,19 @@ medias.
 claves en la configuración del CLI, fuera de `.env.local`, y moverlas obliga a pasar el secreto
 por un comando. También se descartó `rpc.Server.fundAddress` del SDK, por la carrera descrita
 arriba.
+
+---
+
+### P-11 · La tarea se marca terminada dentro de su propio PR · `Vigente`
+**Fecha:** 2026-10-16 (cierre de la Fase 0) · Decidido por el usuario
+
+Al tener el OK del merge y la CI en verde, `/tarea` agrega en la misma rama un commit `docs(...)` que marca la tarea
+✅ en `docs/ESTADO.md` y en la bitácora, con el enlace al PR y el resultado de la CI. Después hace el fast-forward.
+No hay un PR de cierre aparte.
+
+**Motivo.** En la Fase 0, cada tarea necesitó un segundo PR solo para marcarse terminada (#2 y #4), y entre los dos
+merges `main` decía que una tarea mergeada seguía "en revisión". Fue el punto "qué no funcionó" de la retro.
+
+**Alternativa descartada:** el flujo de AgentPey, con un PR `cc/t<n>-cierre` después de cada merge. Duplica los PRs y
+la espera de CI, y deja `main` desactualizado entre medio.
+
