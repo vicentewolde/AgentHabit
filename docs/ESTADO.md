@@ -42,6 +42,8 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
 
 ## Notas
 
+- **Hackatón de Avalanche (16-oct):** se entrega este mismo repo. El README tiene una sección para jueces
+  (problema, cómo funciona, por qué Avalanche, arquitectura y avance). Sin código nuevo.
 - **Calendario de la Fase 1:** Stellar testnet se reinicia el 16-dic-2026. La semana real de 7 días tiene que
   liquidarse antes, o hay que redesplegar (spec, sección 8).
 - **Antes de la Fase 3:** consultar a developers@strava.com si el producto calza con los términos de la API (spec,

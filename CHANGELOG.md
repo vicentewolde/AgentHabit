@@ -6,6 +6,10 @@ Cada tag se crea solo con permiso del usuario.
 
 ## [Sin publicar]
 
+### Cambiado
+- **README para la hackatón de Avalanche:** el README explica el problema, cómo funciona el
+  compromiso (con un diagrama), por qué Avalanche, la arquitectura y el avance real del proyecto.
+
 ## [0.0.1] - 2026-10-16
 
 Fase 0 · Fundamentos. AgentHabit ya tiene su casa y su forma de trabajar:
