@@ -11,8 +11,8 @@ stays locked in the contract forever: nobody collects it, not the platform and n
   can return the deposit to its owner.
 - **Testnet only** (Stellar testnet and Avalanche Fuji) until Phase 2.
 
-Status: Phase 0 (foundations). See [ROADMAP.md](ROADMAP.md). Project docs are in Spanish under
-[docs/](docs/).
+Status: Phase 1 (MVP on testnet); Phase 0 closed at `v0.0.1`. See [ROADMAP.md](ROADMAP.md).
+Project docs are in Spanish under [docs/](docs/).
 
 ## Layout
 

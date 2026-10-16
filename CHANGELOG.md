@@ -6,6 +6,16 @@ Cada tag se crea solo con permiso del usuario.
 
 ## [Sin publicar]
 
+## [0.0.1] - 2026-10-16
+
+Fase 0 · Fundamentos. AgentHabit ya tiene su casa y su forma de trabajar:
+- un repo público con la estructura de la app y de los dos contratos;
+- las herramientas instaladas y fijadas, para que tu Mac y la CI compilen lo mismo;
+- las claves de prueba de Stellar y Avalanche, creadas sin mostrarse nunca;
+- el plan de la Fase 1 aprobado, que ya incorpora los términos de Strava.
+
+Todavía no hay una app que usar: los contratos están vacíos y la Fase 1 los llena.
+
 ### Añadido
 - **El repo y su método (T1):** la estructura del monorepo (web, API, liquidador, dominio común,
   un adaptador por cadena, los contratos de Stellar y Avalanche), vacía pero compilando;
@@ -19,3 +29,5 @@ Cada tag se crea solo con permiso del usuario.
   trustline de USDC del usuario de prueba e imprime las direcciones de Fuji para los faucets. Los
   contratos vacíos de las dos cadenas compilan y se prueban en local y en CI
   (`pnpm run contracts:build:stellar`, `forge test`), con versiones fijadas.
+- **El plan de la Fase 1 (T3):** [`docs/fase-1-mvp-testnet/SPEC.md`](docs/fase-1-mvp-testnet/SPEC.md),
+  aprobado: 14 tareas para un compromiso completo en Stellar testnet y en Fuji.

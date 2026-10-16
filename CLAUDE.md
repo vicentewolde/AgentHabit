@@ -13,8 +13,11 @@ con el mismo comportamiento.
 | [ROADMAP.md](ROADMAP.md) | **Empieza aquí.** Las fases, en cuál estamos, qué sigue |
 | [docs/ESTADO.md](docs/ESTADO.md) | El tablero del día a día: fase actual, tabla de tareas, siguiente paso y pendientes del usuario. Lo lee `/estado` y lo actualiza `/tarea` |
 | [docs/DECISIONES.md](docs/DECISIONES.md) | Decisiones del proyecto (prefijo `P-`). No se re-litigan: ver regla 2 |
-| [docs/fase-0-fundamentos/claude-code-mensaje-inicial.md](docs/fase-0-fundamentos/claude-code-mensaje-inicial.md) | El mensaje inicial: contexto, restricciones, el contrato, datos de red, Strava y el borrador de la Fase 1 |
-| [docs/fase-0-fundamentos/BITACORA.md](docs/fase-0-fundamentos/BITACORA.md) | **Fase en curso.** Qué se hizo en cada tarea de la Fase 0 |
+| [docs/fase-1-mvp-testnet/SPEC.md](docs/fase-1-mvp-testnet/SPEC.md) | **Spec de la fase en curso** (Aprobado): tareas T4–T17, el contrato vigente (4.2) y lo verificado de Strava (4.8) |
+| [docs/fase-1-mvp-testnet/DECISIONES.md](docs/fase-1-mvp-testnet/DECISIONES.md) | Decisiones de la Fase 1 (prefijo `A-`) |
+| [docs/fase-1-mvp-testnet/BITACORA.md](docs/fase-1-mvp-testnet/BITACORA.md) | **Fase en curso.** Qué se hizo en cada tarea de la Fase 1 |
+| [docs/fase-0-fundamentos/claude-code-mensaje-inicial.md](docs/fase-0-fundamentos/claude-code-mensaje-inicial.md) | Histórico: el mensaje inicial (contexto y restricciones). El contrato y Strava vigentes están en el spec de la Fase 1, que corrigió este borrador (`A-4`, `A-9`) |
+| [docs/fase-0-fundamentos/BITACORA.md](docs/fase-0-fundamentos/BITACORA.md) | Fase 0 cerrada (`v0.0.1`): qué se hizo en T1–T3 |
 | [docs/integraciones/](docs/integraciones/) | Notas verificadas de servicios externos (Strava en T8), escritas por el subagente `integraciones` |
 | [README.md](README.md) | Cómo correr el proyecto |
 
@@ -136,12 +139,18 @@ pnpm run contracts:test:stellar
 ```
 
 ```bash
+pnpm run contracts:build:stellar
+```
+
+```bash
 pnpm run contracts:test:evm
 ```
 
 `pnpm check` = `biome check . && tsc -b && vitest run`; no toca la red. Los tests de contratos
-corren en las tareas que tocan contratos y en CI, como jobs aparte: Soroban desde T1 y Foundry
-desde T2. `contracts:test:evm` necesita Foundry, que se instala en T2.
+corren en las tareas que tocan contratos y en CI, como jobs aparte. El wasm de Soroban se compila
+solo con `pnpm run contracts:build:stellar` (`stellar contract build`, `P-8`).
+`contracts:test:evm` necesita Foundry 1.8.5 en el `PATH`
+(`export PATH="$PATH:$HOME/.foundry/bin"`).
 
 `rustup` viene de Homebrew y es keg-only; hace falta
 `export PATH="/opt/homebrew/opt/rustup/bin:$PATH"` para que exista `cargo`.

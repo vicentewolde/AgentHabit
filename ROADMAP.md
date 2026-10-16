@@ -2,10 +2,10 @@
 
 > El mapa de las fases: qué prueba cada una, en cuál estamos y qué sigue. El día a día está en
 > [docs/ESTADO.md](docs/ESTADO.md); las decisiones, en [docs/DECISIONES.md](docs/DECISIONES.md).
-> El contexto completo, con el contrato, los datos de red y Strava, está en el
-> [mensaje inicial](docs/fase-0-fundamentos/claude-code-mensaje-inicial.md).
+> El contexto inicial está en el [mensaje inicial](docs/fase-0-fundamentos/claude-code-mensaje-inicial.md); el
+> contrato y Strava vigentes, en el [spec de la Fase 1](docs/fase-1-mvp-testnet/SPEC.md).
 
-**Actualizado:** 2026-10-15 · **Fase en curso:** Fase 0 · Fundamentos
+**Actualizado:** 2026-10-16 · **Fase en curso:** Fase 1 · MVP en testnet
 
 ## 1. Qué es
 
@@ -28,14 +28,14 @@ Lo que fija el diseño, de la evaluación de negocio del 13 y 14 de octubre:
 
 | Fase | Nombre | Qué prueba | Tag | Estado |
 |---|---|---|---|---|
-| 0 | Fundamentos | El repo existe con el método, las herramientas y el spec de la Fase 1 aprobado | v0.0.1 | 🔨 en curso |
-| 1 | MVP en testnet | Un compromiso completo en Stellar testnet y en Fuji: comprometerse, correr, liquidar, fallar y la devolución por plazo vencido | v0.1.0 | ⏳ |
+| 0 | Fundamentos | El repo existe con el método, las herramientas y el spec de la Fase 1 aprobado | v0.0.1 | ✅ cerrada el 16-oct |
+| 1 | MVP en testnet | Un compromiso completo en Stellar testnet y en Fuji: comprometerse, correr, liquidar, fallar y la devolución por plazo vencido | v0.1.0 | 🔨 en curso |
 | 2 | Mainnet para el fundador | Revisión del contrato, despliegue en mainnet y 4 semanas de uso real del usuario | v0.2.0 | ⏳ |
 | 3 | Piloto con 9 invitados | 4 semanas con dinero real de terceros (9 + el usuario = 10, el máximo de Strava sin revisión) | v0.3.0 | ⏳ |
 
 Cada tag se crea solo con permiso del usuario.
 
-### Fase 0 · Fundamentos (en curso)
+### Fase 0 · Fundamentos (cerrada el 16-oct-2026, `v0.0.1`)
 
 | Tarea | Qué deja |
 |---|---|
@@ -43,7 +43,7 @@ Cada tag se crea solo con permiso del usuario.
 | T2 · Herramientas y claves | Rust con `wasm32v1-none`, `stellar` CLI y Foundry verificados; versiones vivas como decisiones `P-`; `pnpm run bootstrap` con las claves de testnet en `.env.local` |
 | T3 · `/fase-plan 1` | El spec de la Fase 1 aprobado y el tag `v0.0.1` |
 
-### Fase 1 · MVP en testnet
+### Fase 1 · MVP en testnet (en curso)
 
 Spec **Aprobado** el 16-oct-2026: [`docs/fase-1-mvp-testnet/SPEC.md`](docs/fase-1-mvp-testnet/SPEC.md), con sus
 decisiones `A-1` a `A-11` en [`DECISIONES.md`](docs/fase-1-mvp-testnet/DECISIONES.md). Unas 93 h, sin fecha

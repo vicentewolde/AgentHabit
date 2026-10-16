@@ -53,7 +53,7 @@ jobs:
           persist-credentials: false
 
       # rustup is preinstalled on the runner and reads contracts/stellar/rust-toolchain.toml
-      # (stable + wasm32v1-none) on the first cargo call.
+      # (1.98.0 + wasm32v1-none, P-8) on the first cargo call.
       - name: Contract tests
         working-directory: contracts/stellar
         run: cargo test --locked

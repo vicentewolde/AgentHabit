@@ -13,8 +13,8 @@
 
 ## Estado actual
 
-**Fecha:** 2026-10-16 · Spec **Aprobado** por el usuario, en T3 (Fase 0). Nada implementado todavía. La fase
-empieza con `/tarea T4` después del merge de T3 y del tag `v0.0.1`.
+**Fecha:** 2026-10-16 · **Fase en curso** desde el cierre de la Fase 0 (`v0.0.1`). Spec **Aprobado** en T3.
+Nada implementado todavía. Siguiente: `/tarea T4`.
 
 ## Progreso
 

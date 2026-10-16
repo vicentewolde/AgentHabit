@@ -12,8 +12,8 @@
 
 ## Estado actual
 
-**Fecha:** 2026-10-16 · **T3 en revisión** en la rama `cc/t3-fase-plan-1`: el spec de la Fase 1
-quedó Aprobado por el usuario. Falta el merge y el tag `v0.0.1`, que cierran la Fase 0.
+**Fecha:** 2026-10-16 · **Fase 0 cerrada** (T1–T3), tag `v0.0.1`. Cada criterio se verificó en el cierre (abajo).
+La fase en curso es la 1: [bitácora](../fase-1-mvp-testnet/BITACORA.md).
 
 ## Progreso
 
@@ -21,7 +21,7 @@ quedó Aprobado por el usuario. Falta el merge y el tag `v0.0.1`, que cierran la
 |---|---|
 | T1 Repo y método | ✅ terminada |
 | T2 Herramientas y claves | ✅ terminada |
-| T3 `/fase-plan 1` | 👀 en revisión |
+| T3 `/fase-plan 1` | ✅ terminada |
 
 ---
 
@@ -164,7 +164,37 @@ Aprobó además `A-1` a `A-7` como estaban, y que `pnpm release-stale` pida conf
 - **Reinicio de testnet:** Stellar testnet se reinicia el 16-dic-2026, y la semana real de 7 días va antes.
 - **Términos de Strava:** antes del piloto con terceros conviene consultar a Strava.
 
-**Pendiente para cerrar T3 y la Fase 0.**
-- Push, PR y merge con el OK del usuario.
-- El tag `v0.0.1`, con su permiso.
+**Cierre.** Merge del [PR #5](https://github.com/vicentewolde/AgentHabit/pull/5) el 16-oct por fast-forward
+(`f9f5571`), con la CI en verde. El tag `v0.0.1` se creó sobre ese commit, con permiso del usuario.
+
+---
+
+## Cierre de la Fase 0 (`/fase-cerrar 0`, 16-oct)
+
+**Criterios del spec** (el mensaje inicial, sección "Fase 0"), verificados el 16-oct sobre `f9f5571`:
+
+| Criterio | Cómo se demostró | |
+|---|---|---|
+| T1: `pnpm install --frozen-lockfile && pnpm check` en verde | Se corrió en el cierre: "Already up to date", Biome con 46 archivos, 45 tests en verde | [x] |
+| T1: `/estado` responde con el formato de AgentPey | Salida real del 15-oct en [evidencia/T1.md](evidencia/T1.md) | [x] |
+| T1: repo en GitHub y primer PR aprobados por el usuario | `vicentewolde/AgentHabit` público; [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1) mergeado | [x] |
+| T2: `pnpm run bootstrap` dos veces seguidas sin pisar nada | Corridas 2, 3 y 4 contra testnet en [evidencia/T2.md](evidencia/T2.md). No se volvió a correr: toca la red | [x] |
+| T2: `cargo test` y `forge test` corren | Se corrieron en el cierre: 1 test cada uno, en verde; el wasm sigue con el hash `0e69f92b…` | [x] |
+| T2: un test verifica que ningún secreto sale por consola | `never prints a secret, on the first run or the second`, en verde en el cierre | [x] |
+| T3: spec de la Fase 1 en estado Aprobado | [SPEC.md](../fase-1-mvp-testnet/SPEC.md): "Estado: Aprobado (2026-10-16)" | [x] |
+| T3: tag `v0.0.1` con permiso | `git ls-remote --tags origin v0.0.1` → `c1f3b1e…` | [x] |
+
+**Coherencia.** El subagente `arquitecto` contrastó los docs con el código. Encontró 15 desvíos, casi todos docs que
+seguían diciendo "Fase 0 en curso" o mandando al mensaje inicial para el contrato y Strava. Se corrigieron en este
+cierre, salvo tres cambios de configuración que esperan el OK del usuario: los agentes `arquitecto` e
+`integraciones`, y un permiso en `settings.json`.
+
+**Retro.**
+- **Qué funcionó:** verificar todo en la fuente antes de decidir. Así aparecieron el protocolo 29, que `soroban-sdk`
+  29 rechaza `cargo build`, Friendbot colgado, las 19 h de eventos de la RPC y los términos de Strava. Lo mismo vale
+  para las revisiones de `revisor` y `arquitecto`, que encontraron problemas reales en cada tarea.
+- **Qué no:** los docs de estado quedaron atrasados en cada merge. Hicieron falta dos PRs extra de cierre (#2 y #4),
+  y la primera corrida de `bootstrap` falló porque se confió en la respuesta de un servicio externo.
+- **Qué cambiar en la Fase 1:** marcar la tarea ✅ en el mismo PR, antes del merge, para evitar el PR de cierre. Y
+  ante cualquier servicio externo, confiar en el estado de la red y no en su respuesta HTTP.
 
