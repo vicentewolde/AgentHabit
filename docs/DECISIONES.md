@@ -185,7 +185,8 @@ Todo se resolvió el 15-oct-2026 contra la fuente, no de memoria:
   directo ("soroban-sdk requires stellar-cli v25.2.0+ to build a contract"), porque el CLI aplica
   al wasm un paso que cargo no hace. El "Hecho cuando" heredado de la revisión de T1 se cumple con
   el comando nuevo: `pnpm run contracts:build:stellar` en local y un paso del job de CI, con la
-  action oficial `stellar/stellar-cli` fijada por SHA.
+  action oficial `stellar/stellar-cli` fijada por SHA. El usuario aceptó el cambio de redacción
+  del criterio en el chat el 15-oct, tras `/revisar`.
 - **`evm_version` se fija a mano en `cancun`.** La C-Chain de Avalanche corre Cancun y todavía no
   Pectra (ACP-131; guía "Deploy a Smart Contract" de docs.avax.network, consultada el 15-oct), y
   solc 0.8.30 o posterior compila para Pectra por defecto.

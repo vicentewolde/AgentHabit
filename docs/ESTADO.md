@@ -34,7 +34,7 @@
 
 ## Notas
 
-- **Desvío del plan (`P-8`), pendiente de que lo aceptes:** el contrato de Soroban se compila con
+- **Desvío del plan (`P-8`), aceptado por el usuario el 15-oct:** el contrato de Soroban se compila con
   `stellar contract build` (`pnpm run contracts:build:stellar`), porque `soroban-sdk` 29 no acepta
   `cargo build --release --target wasm32v1-none`. CI hace lo mismo.
 - Para correr un segundo bootstrap si el primero quedó colgado: el lock `.env.local.lock` se
