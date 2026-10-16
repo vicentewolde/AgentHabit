@@ -126,7 +126,7 @@ The full plan, with every task, is in [ROADMAP.md](ROADMAP.md) and the
 ```
 apps/        web · api · settler (the oracle's daily job)
 packages/    core · config · db · strava · chain-stellar · chain-avalanche
-contracts/   stellar/ (Cargo workspace) · evm/ (Foundry project)
+contracts/   stellar/ (Cargo workspace) · evm/ (Foundry project) · fixtures/ (shared case table)
 deployments/ the only bridge between TypeScript and the contracts
 scripts/     bootstrap and deploy scripts
 docs/        roadmap state, decisions, phase specs and logs (Spanish)
@@ -198,6 +198,13 @@ EVM contract tests:
 
 ```bash
 pnpm run contracts:test:evm
+```
+
+Regenerate the shared case table both contracts run, after changing it in `packages/core`
+(`pnpm check` fails while `contracts/fixtures/cases.json` is stale):
+
+```bash
+pnpm run cases:gen
 ```
 
 Testnet keys, Friendbot and the USDC trustline (touches Stellar testnet; safe to run again):

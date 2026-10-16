@@ -11,6 +11,8 @@ Estados: `Vigente` · `Superada` · `Pendiente`
 - **`A-1` a `A-7`:** las propuso Claude Code en T3, a partir de la verificación de la red, del informe de
   `integraciones` sobre Strava y de la revisión del `arquitecto`. El usuario las aprobó con el spec el 16-oct.
 - **`A-8` a `A-11`:** las decidió el usuario el 16-oct, en las preguntas de T3.
+- **`A-12` a `A-14`:** las tomó Claude Code en T4, donde el spec dejaba la cifra o el detalle a esa tarea. Se
+  revisan con `/revisar` antes del merge.
 - Las referencias a tareas usan la numeración agrupada del 16-oct (T4 a T9; ver el registro de cambios del spec).
 
 ---
@@ -202,3 +204,70 @@ ejercicio, también en el ensayo.
 
 **Alternativa descartada:** que el operador declare el resultado solo en las instancias de ensayo. Era la
 recomendada, porque no exige salir a correr a una hora fija, pero abría un camino manual en el liquidador.
+
+---
+
+### A-12 · Los errores del contrato se numeran desde 101 · `Vigente`
+**Fecha:** 2026-10-16 · **Tarea:** T4
+
+Los 11 errores propios llevan los números 101 a 111 en el `#[contracterror]` de Soroban y en
+`contracts/fixtures/cases.json`. Solidity los identifica por nombre (selector), sin número.
+
+Los fallos ajenos se clasifican así:
+- un número de error que no es nuestro es `TokenFailure`: solo puede venir del SAC;
+- un aborto del host sin número es `Unauthorized`: así termina un `require_auth` sin firma.
+
+**Motivo.** Un error del Stellar Asset Contract (códigos 1 a 13) viaja a través de `commit`, `settle` y
+`release_if_stale` con su propio número. Con nuestros errores en 1 a 11, el `BalanceDeauthorizedError` (11) del SAC
+llegó al cliente como nuestro `BalanceMismatch` (11). Pasó en la primera corrida de la tabla (`evidencia/T4.md`), y
+el adaptador de T6 habría confundido lo mismo en la red.
+
+**Alternativa descartada:** atrapar los errores del token en el contrato y devolver uno propio. Agrega lógica en
+el camino de los fondos y cambia la categoría `TokenFailure` del spec (4.3) por un error del contrato.
+
+---
+
+### A-13 · TTL de Soroban: umbral de 30 días y extensión a 31 · `Vigente`
+**Fecha:** 2026-10-16 · **Tarea:** T4
+
+Cada escritura (`commit`, `settle` y `release_if_stale`) extiende la posición y la instancia con
+`extend_ttl(518.400, 535.680)`. En ledgers de 5 segundos, eso equivale a un umbral de 30 días y una extensión a 31. El
+constructor extiende la instancia igual.
+
+**Motivo.** En producción una posición vive como máximo unos 21 días: se compromete hasta una semana antes, la
+semana dura 7 días y la ventana de `settle` 7 más. Con 31 días queda margen, y el spec pide al menos 30 (4.2). Las
+cifras están dentro de los límites que la red publicó el 16-oct:
+- `max_entry_ttl` es 3.110.400 ledgers;
+- `min_persistent_ttl` es 120.960;
+- el cierre objetivo de un ledger es 5.000 ms.
+
+Si una posición bloqueada por el token pasa más de 31 días sin escrituras, se archiva. La red la restaura al tocarla
+(protocolo 23 y siguientes), y el test con 40 días lo verifica en testutils. En la red se comprueba en T6.
+
+**Alternativa descartada:** extender al máximo de la red (unos 180 días). Cuesta más renta por cada posición y no
+cambia nada: la restauración automática ya cubre a quien vuelva tarde.
+
+---
+
+### A-14 · El orden exacto de las validaciones, por función · `Vigente`
+**Fecha:** 2026-10-16 · **Tarea:** T4
+
+El spec (4.2) fija el orden general y deja a T4 el detalle por función. Queda así, en
+`VALIDATION_ORDER` de `packages/core` y en la tabla:
+
+| Función | Orden |
+|---|---|
+| `commit` | `BeforeAnchor` → `Unauthorized` → `AlreadyCommitted` → `WrongWeek` → `AmountOutOfRange` → `GoalOutOfRange` → `TokenFailure` → `BalanceMismatch` |
+| `settle` | `Unauthorized` → `PositionNotFound` → `PositionNotActive` → `OutsideSettleWindow` → `TokenFailure` |
+| `release_if_stale` | `PositionNotFound` → `PositionNotActive` → `NotStaleYet` → `TokenFailure` |
+| `current_week` | `BeforeAnchor` |
+
+- `settle` y `release_if_stale` no revisan el ancla: una posición existente se comprometió después de ella.
+- `AlreadyCommitted` se aplica a una posición en cualquier estado, también los finales.
+
+La tabla tiene un caso por cada par vecino de cada función.
+
+**Motivo.** Con el orden fijo, dos fallas simultáneas dan el mismo error en las dos cadenas, y la tabla lo prueba.
+
+**Alternativa descartada:** comprobar el ancla también en `settle` y `release_if_stale`. Es una validación que
+nunca puede fallar sin que antes falle `PositionNotFound`.

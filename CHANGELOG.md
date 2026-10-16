@@ -6,6 +6,12 @@ Cada tag se crea solo con permiso del usuario.
 
 ## [Sin publicar]
 
+### Añadido
+- **Los dos contratos (T4):** el de Avalanche (Solidity) y el de Stellar (Soroban) guardan el depósito, lo devuelven
+  si se cumple la meta, lo dejan bloqueado si no, y permiten que cualquiera lo devuelva a su dueño si el oráculo no
+  liquidó a tiempo. Los dos pasan la misma tabla de 44 casos, escrita una sola vez en el núcleo común. Todavía no
+  están desplegados.
+
 ### Cambiado
 - **README para la hackatón de Avalanche:** el README explica el problema, cómo funciona el
   compromiso (con un diagrama), por qué Avalanche, la arquitectura y el avance real del proyecto.

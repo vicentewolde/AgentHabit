@@ -16,3 +16,8 @@ remappings = [
   "forge-std/=lib/forge-std/src/",
   "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
 ]
+# The shared case table, generated from packages/core (A-3). Read-only, and nothing else.
+fs_permissions = [{ access = "read", path = "../fixtures" }]
+
+[fuzz]
+runs = 1024

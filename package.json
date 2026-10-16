@@ -18,6 +18,7 @@
     "contracts:test": "pnpm run contracts:test:stellar && pnpm run contracts:test:evm",
     "contracts:build:stellar": "cd contracts/stellar && stellar contract build --locked",
     "contracts:build:evm": "forge build --root contracts/evm",
+    "cases:gen": "tsx --conditions=@agenthabit/source scripts/gen-cases.ts",
     "bootstrap": "tsx --conditions=@agenthabit/source scripts/bootstrap.ts"
   },
   "devDependencies": {

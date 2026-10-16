@@ -8,12 +8,12 @@
 
 **Actualizado:** 2026-10-16
 **Fase en curso:** Fase 1 · MVP en testnet. Su spec es [fase-1-mvp-testnet/SPEC.md](fase-1-mvp-testnet/SPEC.md)
-(**Aprobado** el 16-oct), con las decisiones `A-1` a `A-11`.
+(**Aprobado** el 16-oct), con las decisiones `A-1` a `A-14` (`A-12` a `A-14` de T4).
 
 **Fase anterior:** Fase 0 · Fundamentos, **cerrada** el 16-oct con el tag `v0.0.1`
 ([bitácora](fase-0-fundamentos/BITACORA.md), con la verificación de criterios y la retro).
 **Última tarea terminada:** T3 `/fase-plan 1` ([PR #5](https://github.com/vicentewolde/AgentHabit/pull/5), mergeado el 16-oct por fast-forward).
-**Siguiente paso:** `/tarea T4` — Núcleo y contratos. En paralelo, en otra sesión, `/tarea T5` — Strava, API y km de la semana.
+**Siguiente paso:** `/revisar` de T4 (rama `cc/t4-nucleo-y-contratos`). En paralelo, en otra sesión, `/tarea T5` — Strava, API y km de la semana.
 
 ## Progreso de la Fase 1
 
@@ -22,7 +22,7 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
 
 | Tarea | Estado | Rama / PR |
 |---|---|---|
-| T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | ⏳ pendiente | |
+| T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | 👀 en revisión | `cc/t4-nucleo-y-contratos` |
 | T5 Strava, API y km de la semana | ⏳ pendiente | |
 | T6 Despliegue en testnet y liquidación | ⏳ pendiente | |
 | T7 Web (compromiso, estado de la semana, reglas) | ⏳ pendiente | |
@@ -42,6 +42,8 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
 
 ## Notas
 
+- **T4:** la tabla de casos se regenera con `pnpm run cases:gen`; `pnpm check` falla si `contracts/fixtures/cases.json`
+  quedó desactualizado. Los errores del contrato se numeran desde 101 (`A-12`).
 - **Hackatón Vinny (Avalanche):** se entrega este mismo repo, con el README para jueces del PR #9. Plazo y
   requisitos son supuestos (el usuario solo dio el nombre): ficha y faltantes en
   [HACKATON-VINNY.md](HACKATON-VINNY.md). Lo que falta es el contrato en Fuji (T4 + despliegue de T6) y el video.

@@ -11,6 +11,7 @@
       "Bash(pnpm typecheck*)",
       "Bash(pnpm run contracts:test*)",
       "Bash(pnpm run contracts:build*)",
+      "Bash(pnpm run cases:gen)",
       "Bash(pnpm exec biome *)",
       "Bash(pnpm exec vitest *)",
       "Bash(pnpm exec tsc *)",

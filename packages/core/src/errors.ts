@@ -6,8 +6,14 @@
  * single source of truth for what can go wrong across packages and apps.
  */
 export type AgentHabitErrorCode =
+  /** A chain timestamp falls before the deployment's week anchor: there is no week yet. */
+  | "BeforeAnchor"
   /** Local configuration is missing, malformed or internally inconsistent. */
   | "ConfigError"
+  /** Contract parameters break the constructor rules of spec 4.2. */
+  | "InvalidConfig"
+  /** A run distance is not a finite, non-negative number of metres. */
+  | "InvalidDistance"
   /** A network service (RPC, Friendbot) failed or answered something unexpected. */
   | "NetworkError"
   /** An output line was about to carry a secret; it is never written. */
