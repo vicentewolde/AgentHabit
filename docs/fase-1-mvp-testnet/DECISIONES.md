@@ -11,11 +11,12 @@ Estados: `Vigente` · `Superada` · `Pendiente`
 - **`A-1` a `A-7`:** las propuso Claude Code en T3, a partir de la verificación de la red, del informe de
   `integraciones` sobre Strava y de la revisión del `arquitecto`. El usuario las aprobó con el spec el 16-oct.
 - **`A-8` a `A-11`:** las decidió el usuario el 16-oct, en las preguntas de T3.
+- Las referencias a tareas usan la numeración agrupada del 16-oct (T4 a T9; ver el registro de cambios del spec).
 
 ---
 
 ### A-1 · Liquidación con un Cron Job diario, no semanal · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T11 y T16)
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T6 y T8)
 
 El liquidador corre todos los días a las 03:30 UTC y, de forma idempotente, hace tres cosas:
 - liquida lo que está en su ventana;
@@ -32,7 +33,7 @@ reintentos, corre justo en el borde de la ventana, y cualquier adelanto del relo
 ---
 
 ### A-2 · El oráculo encuentra las posiciones en un espejo verificado, no en los eventos · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T9, T11 y T12)
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T5, T6 y T7)
 
 Así funciona el espejo:
 1. Tras un `commit`, la web informa la posición a la API.
@@ -56,7 +57,7 @@ proveedor de RPC, y en Stellar ya hoy no alcanza.
 ---
 
 ### A-3 · La tabla de casos vive en `packages/core` y se exporta a `contracts/fixtures/cases.json` · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T4, T5 y T6)
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T4)
 
 - **Dónde vive.** La tabla se escribe como datos en `packages/core`. `scripts/gen-cases.ts` la exporta a un JSON
   plano, que se commitea.
@@ -75,7 +76,7 @@ sola y ningún paquete TS importa de `contracts/`.
 ---
 
 ### A-4 · `settle` recibe `met` (cumplió o no), no la distancia · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T4, T5, T6 y T11)
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T4 y T6)
 
 La firma es `settle(user, week_id, met)`. La comparación `distancia ≥ meta` vive una sola vez en `packages/core` y
 la hace el oráculo. La distancia no se publica en la cadena.
@@ -94,7 +95,7 @@ dato derivado de Strava.
 ---
 
 ### A-5 · Lo perdido queda en el contrato · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T5 y T6)
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T4)
 
 Lo `Forfeited` queda bloqueado para siempre en el contrato, visible en `total_forfeited`. Era la recomendación del
 mensaje inicial (pregunta abierta 2).
@@ -109,10 +110,10 @@ mensaje inicial (pregunta abierta 2).
 
 ---
 
-### A-6 · Sin Exponential en la Fase 1, y `localhost` hasta T16 · `Vigente`
+### A-6 · Sin Exponential en la Fase 1, y `localhost` hasta T8 · `Vigente`
 **Fecha:** 2026-10-16 · **Tarea:** T3
 
-No hay tablero espejo en Exponential. La web y el callback de Strava usan `localhost` hasta que T16 elija el dominio
+No hay tablero espejo en Exponential. La web y el callback de Strava usan `localhost` hasta que T8 elija el dominio
 real. Era la recomendación del mensaje inicial (preguntas abiertas 3 y 4).
 
 **Motivo.** La comparación de Exponential sigue en curso en AgentPey. En la Fase 1 solo se conecta la cuenta del
@@ -123,7 +124,7 @@ usuario, y `localhost` alcanza hasta publicar.
 ---
 
 ### A-7 · Firmar en `live` exige `SETTLE_MODE=live` y además `--live` · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T11 y T16)
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T6 y T8)
 
 - El liquidador firma `settle` y `release_if_stale` solo con los dos interruptores.
 - En `dry-run` no carga la clave del oráculo: el adaptador recibe un firmante solo en `live`.
@@ -141,7 +142,7 @@ usuario, y `localhost` alcanza hasta publicar.
 ---
 
 ### A-8 · Solo se compromete la semana siguiente · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T4, T5 y T6) · Decidido por el usuario
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T4) · Decidido por el usuario
 
 `commit` exige `week_id == current_week + 1`, con igualdad estricta.
 
@@ -153,7 +154,7 @@ km ya corridos.
 ---
 
 ### A-9 · Cuentan `Run` y `TrailRun` · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T4 y T10) · Decidido por el usuario
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T5) · Decidido por el usuario
 
 Una actividad cuenta si cumple todo esto:
 - su `sport_type` es `Run` o `TrailRun`;
@@ -172,7 +173,7 @@ Una actividad cuenta si cumple todo esto:
 ---
 
 ### A-10 · Revocar el acceso a Strava cuenta como 0 km · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T9, T11, T12 y T14) · Decidido por el usuario
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T5, T6 y T7) · Decidido por el usuario
 
 Si el usuario revocó el acceso, la semana se liquida como no cumplida (`Forfeited`). Hay revocación cuando:
 - el usuario desconecta Strava desde la web;
@@ -184,16 +185,16 @@ en `release_if_stale`. Las reglas y la confirmación lo dicen en una frase.
 **Motivo.** Sin esta regla, quien no cumplió podría revocar el acceso el lunes y recuperar el depósito.
 
 **Riesgo aceptado.** Un refresh token que perdiéramos nosotros se vería igual que una revocación. Se mitiga
-guardando la rotación de forma atómica, con test (T9), y registrando el motivo de cada liquidación.
+guardando la rotación de forma atómica, con test (T5), y registrando el motivo de cada liquidación.
 
 **Alternativa descartada:** devolver el depósito ante cualquier falta de datos. Es fail-safe puro, pero abusable.
 
 ---
 
 ### A-11 · El ensayo de 1 hora usa carreras reales de Strava, con meta mínima de 500 m · `Vigente`
-**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T7, T11 y T15) · Decidido por el usuario
+**Fecha:** 2026-10-16 · **Tarea:** T3 (aplica en T6 y T8) · Decidido por el usuario
 
-Las instancias de ensayo tienen `min_goal_m = 500`. En T15 el usuario corre dentro de la hora comprometida, y el
+Las instancias de ensayo tienen `min_goal_m = 500`. En T8 el usuario corre dentro de la hora comprometida, y el
 liquidador saca el resultado de Strava, igual que en producción. No existe ningún camino para un resultado manual.
 
 **Motivo.** Es la opción más fiel a la restricción 4 de `CLAUDE.md`: Strava es la única fuente de verdad del

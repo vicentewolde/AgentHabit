@@ -1,1 +1,1 @@
-// Avalanche implementation of ChainAdapter (P-2). Lands with T7 and T11.
+// Avalanche implementation of ChainAdapter (P-2). Lands with T6.

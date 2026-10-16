@@ -17,7 +17,7 @@ Project docs are in Spanish under [docs/](docs/).
 ## Layout
 
 ```
-apps/        web · api · settler (the oracle's weekly job)
+apps/        web · api · settler (the oracle's daily job)
 packages/    core · config · db · strava · chain-stellar · chain-avalanche
 contracts/   stellar/ (Cargo workspace) · evm/ (Foundry project)
 deployments/ the only bridge between TypeScript and the contracts

@@ -49,22 +49,16 @@ Spec **Aprobado** el 16-oct-2026: [`docs/fase-1-mvp-testnet/SPEC.md`](docs/fase-
 decisiones `A-1` a `A-11` en [`DECISIONES.md`](docs/fase-1-mvp-testnet/DECISIONES.md). Unas 93 h, sin fecha
 comprometida; la semana real de 7 días va antes del reinicio de Stellar testnet del 16-dic-2026.
 
+Tareas agrupadas el 16-oct para ganar velocidad (14 → 6). T4 y T5 pueden correr en paralelo.
+
 | Tarea | Qué deja |
 |---|---|
-| T4 · Dominio común y tabla de casos | Semanas, filtros, decisión de liquidación y la tabla que leen los dos contratos |
-| T5 · Contrato Soroban | El contrato y sus tests, pasando la tabla de casos |
-| T6 · Contrato EVM | El contrato, fuzz y reentrada, pasando la misma tabla |
-| T7 · Despliegue en testnet | Producción y ensayo en cada cadena, en `deployments/*.json` |
-| T8 · Strava, prueba técnica | `docs/integraciones/strava.md`, probado con la cuenta del usuario |
-| T9 · API, base y vínculo | Neon, el vínculo wallet ↔ atleta firmado, OAuth y el espejo de posiciones |
-| T10 · Km de la semana | La suma de carreras válidas, con purga a los 7 días |
-| T11 · Liquidación | El liquidador idempotente, en `dry-run` por defecto |
-| T12 · Pantalla de compromiso | Elegir cadena, conectar, comprometer |
-| T13 · Estado de la semana | Km contra meta y el botón "recuperar" |
-| T14 · Reglas y privacidad | Las reglas en lenguaje simple |
-| T15 · Ensayo de punta a punta | Cumplir, fallar y devolución por plazo, con carreras reales, en las dos cadenas |
-| T16 · Publicación en Render | Web, API y el Cron Job diario |
-| T17 · `/fase-cerrar 1` | Criterios con evidencia y el tag `v0.1.0` |
+| T4 · Núcleo y contratos | Semanas, la tabla de casos y los dos contratos pasándola |
+| T5 · Strava, API y km | Prueba con la cuenta del usuario, Neon, vínculo wallet ↔ atleta firmado, OAuth, espejo de posiciones y la suma de carreras válidas con purga a los 7 días |
+| T6 · Despliegue y liquidación | Producción y ensayo en cada cadena, en `deployments/*.json`, y el liquidador idempotente en `dry-run` por defecto |
+| T7 · Web | Comprometerse, estado de la semana con el botón "recuperar", y reglas en lenguaje simple |
+| T8 · Ensayo y Render | Cumplir, fallar y devolución por plazo con carreras reales en las dos cadenas; web, API y Cron Job diario publicados |
+| T9 · `/fase-cerrar 1` | Criterios con evidencia y el tag `v0.1.0` |
 
 ### Fase 2 · Mainnet para el fundador
 

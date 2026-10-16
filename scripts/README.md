@@ -6,8 +6,8 @@ logs.
 | Script | Command | Lands with |
 |---|---|---|
 | `bootstrap.ts` | `pnpm run bootstrap` | T2 ✓ |
-| `deploy-stellar.ts` | `pnpm run deploy:stellar` | T7 |
-| `deploy-avalanche.ts` | `pnpm run deploy:avalanche` | T7 |
+| `deploy-stellar.ts` | `pnpm run deploy:stellar` | T6 |
+| `deploy-avalanche.ts` | `pnpm run deploy:avalanche` | T6 |
 | `lib/` | `env-file`, `network`, `keys`, `stellar-testnet` and the bootstrap logic, with tests | T2 ✓ |
 
 `pnpm run bootstrap` takes no arguments. It writes missing keys to `.env.local` (mode `0600`),

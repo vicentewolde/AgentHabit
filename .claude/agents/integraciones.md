@@ -1,6 +1,6 @@
 ---
 name: integraciones
-description: Investiga servicios externos (Strava, Circle, Stellar, Avalanche) en su documentación oficial vigente y deja notas verificadas en docs/integraciones. Úsalo antes de planificar o implementar cualquier integración; en T8 escribe docs/integraciones/strava.md.
+description: Investiga servicios externos (Strava, Circle, Stellar, Avalanche) en su documentación oficial vigente y deja notas verificadas en docs/integraciones. Úsalo antes de planificar o implementar cualquier integración; en T5 escribe docs/integraciones/strava.md.
 tools: Read, Grep, Glob, WebFetch, WebSearch, Write, Edit
 model: sonnet
 ---

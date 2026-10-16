@@ -13,37 +13,32 @@
 **Fase anterior:** Fase 0 · Fundamentos, **cerrada** el 16-oct con el tag `v0.0.1`
 ([bitácora](fase-0-fundamentos/BITACORA.md), con la verificación de criterios y la retro).
 **Última tarea terminada:** T3 `/fase-plan 1` ([PR #5](https://github.com/vicentewolde/AgentHabit/pull/5), mergeado el 16-oct por fast-forward).
-**Siguiente paso:** `/tarea T4` — Dominio común y tabla de casos.
+**Siguiente paso:** `/tarea T4` — Núcleo y contratos. En paralelo, en otra sesión, `/tarea T5` — Strava, API y km de la semana.
 
 ## Progreso de la Fase 1
 
+Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en el registro de cambios del spec).
+**T4 y T5 son independientes y pueden correr en paralelo,** en dos sesiones.
+
 | Tarea | Estado | Rama / PR |
 |---|---|---|
-| T4 Dominio común y tabla de casos | ⏳ pendiente | |
-| T5 Contrato Soroban | ⏳ pendiente | |
-| T6 Contrato EVM | ⏳ pendiente | |
-| T7 Despliegue en testnet | ⏳ pendiente | |
-| T8 Strava, prueba técnica | ⏳ pendiente | |
-| T9 API, base y vínculo de cuentas | ⏳ pendiente | |
-| T10 Km de la semana | ⏳ pendiente | |
-| T11 Liquidación | ⏳ pendiente | |
-| T12 Pantalla de compromiso | ⏳ pendiente | |
-| T13 Estado de la semana | ⏳ pendiente | |
-| T14 Reglas y privacidad | ⏳ pendiente | |
-| T15 Ensayo de punta a punta | ⏳ pendiente | |
-| T16 Publicación en Render | ⏳ pendiente | |
-| T17 `/fase-cerrar 1` | ⏳ pendiente | |
+| T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | ⏳ pendiente | |
+| T5 Strava, API y km de la semana | ⏳ pendiente | |
+| T6 Despliegue en testnet y liquidación | ⏳ pendiente | |
+| T7 Web (compromiso, estado de la semana, reglas) | ⏳ pendiente | |
+| T8 Ensayo de punta a punta y publicación en Render | ⏳ pendiente | |
+| T9 `/fase-cerrar 1` | ⏳ pendiente | |
 
 ## Pendientes del usuario
 
 - Agregar Foundry al `PATH`, por ejemplo con
   `echo 'export PATH="$PATH:$HOME/.foundry/bin"' >> ~/.zshrc`, porque el instalador no lo hizo.
 - **Fijar el `stellar` CLI local en 28.1.0** (`P-8`): `brew pin stellar-cli`, o reinstalarlo con el comando del
-  README. Si no, un `brew upgrade` lo cambiaría antes de T7, y el wasm local dejaría de coincidir con el de CI.
-- **Para T7:** pedir a mano AVAX de prueba para las tres direcciones de Fuji, y USDC de prueba para el usuario de
+  README. Si no, un `brew upgrade` lo cambiaría antes de T6, y el wasm local dejaría de coincidir con el de CI.
+- **Para T6:** pedir a mano AVAX de prueba para las tres direcciones de Fuji, y USDC de prueba para el usuario de
   prueba en las dos cadenas. Las direcciones están al final de la salida de `pnpm run bootstrap`.
-- **Para T8:** crear la app de Strava. Requiere tu suscripción, y nace en modo un jugador.
-- **Para T9:** una base de datos en Neon.
+- **Para T5 (bloquea su arranque):** crear la app de Strava, que requiere tu suscripción y nace en modo un
+  jugador, y una base de datos en Neon.
 
 ## Notas
 
