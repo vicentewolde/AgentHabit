@@ -11,7 +11,8 @@
 [mensaje inicial](fase-0-fundamentos/claude-code-mensaje-inicial.md), sección "Fase 0".
 
 **Última tarea terminada:** T2 Herramientas y claves ([PR #3](https://github.com/vicentewolde/AgentHabit/pull/3), mergeado el 16-oct por fast-forward).
-**Siguiente paso:** `/fase-plan 1` (T3): convertir el borrador de la Fase 1 en su `SPEC.md`, con un máximo de 4 preguntas, y el tag `v0.0.1` con tu permiso.
+**En revisión:** T3 `/fase-plan 1`, en la rama `cc/t3-fase-plan-1`: el [spec de la Fase 1](fase-1-mvp-testnet/SPEC.md) quedó **Aprobado** el 16-oct.
+**Siguiente paso:** push, PR y merge de T3 con tu OK; después, el tag `v0.0.1` con tu permiso. Luego `/tarea T4` (dominio común y tabla de casos).
 
 ## Progreso de la Fase 0
 
@@ -19,12 +20,14 @@
 |---|---|---|
 | T1 Repo y método | ✅ terminada: estructura compilando, método, registros; `pnpm check` y `cargo test` en verde en CI; `/revisar` sin bloqueantes, hallazgos corregidos ([evidencia](fase-0-fundamentos/evidencia/T1.md)) | [PR #1](https://github.com/vicentewolde/AgentHabit/pull/1), mergeado |
 | T2 Herramientas y claves | ✅ terminada: herramientas fijadas (`P-8`, `P-9`), contratos vacíos que compilan y testean en local y en CI (mismo hash de wasm), `pnpm run bootstrap` corrido contra testnet (`P-10`); `/revisar` con 1 bloqueante y 10 hallazgos más, todos corregidos ([evidencia](fase-0-fundamentos/evidencia/T2.md)) | [PR #3](https://github.com/vicentewolde/AgentHabit/pull/3), mergeado |
-| T3 `/fase-plan 1` | ⏳ pendiente | |
+| T3 `/fase-plan 1` | 👀 en revisión: spec de la Fase 1 **Aprobado** (T4–T17, ~93 h), revisado por `integraciones` (Strava) y `arquitecto`; decisiones `A-1` a `A-11`; falta el merge y el tag `v0.0.1` ([evidencia](fase-0-fundamentos/evidencia/T3.md)) | `cc/t3-fase-plan-1` |
 
 ## Pendientes del usuario
 
 - Agregar Foundry al `PATH`, por ejemplo con
   `echo 'export PATH="$PATH:$HOME/.foundry/bin"' >> ~/.zshrc`, porque el instalador no lo hizo.
+- **Para T8 (Fase 1):** crear la app de Strava. Requiere tu suscripción, y nace en modo un jugador.
+- **Para T9 (Fase 1):** una base de datos en Neon.
 - **Para T7, no bloquea T3:** pedir AVAX de prueba para las tres direcciones de Fuji y USDC de
   prueba para el usuario de prueba, a mano. Las direcciones están al final de la salida de
   `pnpm run bootstrap`.
@@ -43,3 +46,7 @@
 - Friendbot creó cuentas el 15-oct sin responder la petición. El bootstrap confía en el ledger, no
   en Friendbot (`P-10`).
 - Node local es 26.9; el proyecto fija 22 (`.nvmrc`, `P-5`). `pnpm check` pasa en 26.
+- **Calendario de la Fase 1:** Stellar testnet se reinicia el 16-dic-2026. La semana real de 7 días tiene que
+  liquidarse antes, o hay que redesplegar (spec, sección 8).
+- **Antes de la Fase 3:** consultar a developers@strava.com si el producto calza con los términos de la API (spec,
+  4.8).

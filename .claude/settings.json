@@ -41,6 +41,8 @@
       "Bash(pnpm run deploy:*)",
       "Bash(pnpm settle *--live*)",
       "Bash(pnpm run settle *--live*)",
+      "Bash(pnpm release-stale*)",
+      "Bash(pnpm run release-stale*)",
       "Bash(pnpm remove *)",
       "Bash(pnpm --filter *)",
       "Bash(stellar contract deploy*)",

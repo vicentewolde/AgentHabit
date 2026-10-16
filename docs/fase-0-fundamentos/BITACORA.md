@@ -12,9 +12,8 @@
 
 ## Estado actual
 
-**Fecha:** 2026-10-16 · **T2 cerrada:** [PR #3](https://github.com/vicentewolde/AgentHabit/pull/3)
-mergeado por fast-forward con la CI en verde, incluidos los jobs nuevos de los contratos.
-Siguiente: T3, `/fase-plan 1`.
+**Fecha:** 2026-10-16 · **T3 en revisión** en la rama `cc/t3-fase-plan-1`: el spec de la Fase 1
+quedó Aprobado por el usuario. Falta el merge y el tag `v0.0.1`, que cierran la Fase 0.
 
 ## Progreso
 
@@ -22,7 +21,7 @@ Siguiente: T3, `/fase-plan 1`.
 |---|---|
 | T1 Repo y método | ✅ terminada |
 | T2 Herramientas y claves | ✅ terminada |
-| T3 `/fase-plan 1` | ⏳ pendiente |
+| T3 `/fase-plan 1` | 👀 en revisión |
 
 ---
 
@@ -126,3 +125,46 @@ atestación del CLI de Stellar sin permisos extra y compiló el mismo wasm que l
 - Agregar Foundry al `PATH` de la terminal: el instalador no lo hizo solo.
 - Fuji: pegar las tres direcciones en el faucet de AVAX, y la del usuario de prueba en el de USDC
   de Circle. Esto no bloquea T3: hace falta en T7, para desplegar.
+
+---
+
+## T3 · `/fase-plan 1`
+
+**Qué quedó funcionando.** La Fase 1 tiene su plan aprobado:
+[`docs/fase-1-mvp-testnet/SPEC.md`](../fase-1-mvp-testnet/SPEC.md).
+- **Qué hay que construir:** 14 tareas, de T4 a T17, unas 93 horas.
+- **Cómo se demuestra que funciona:** un compromiso completo en Stellar testnet y en Fuji. Uno se compromete, corre,
+  el oráculo liquida con Strava, y si nadie liquida a tiempo, el depósito vuelve igual.
+
+El borrador del mensaje inicial se verificó contra el código, contra la red y contra la documentación oficial de
+Strava, y lo revisó el subagente `arquitecto`.
+
+**Lo que cambió respecto del borrador, y por qué.**
+- **Un error de Strava nunca le cuesta al usuario.** Solo se liquida con la lectura completa; si falla, se
+  reintenta, y si no se resuelve a tiempo, el depósito vuelve.
+- **La distancia no va a la cadena** (`A-4`). Los términos de Strava prohíben guardar sus datos más de 7 días o
+  mostrarlos a terceros, y la cadena es pública y permanente.
+- **Liquidación todos los días, no una vez por semana** (`A-1`). Así un fallo se reintenta dentro de la ventana.
+- **La wallet firma su vínculo con Strava,** para que nadie ate una wallet ajena a una cuenta vacía.
+- **Botón "recuperar" en la web,** para las posiciones vencidas.
+- **Las posiciones se leen de la base, no de los eventos** (`A-2`). La red pública de Stellar hoy guarda solo
+  ~19 horas de historial.
+- **La tabla de casos que comparten los dos contratos tiene su plomería definida** (`A-3`).
+
+**Lo que decidió el usuario** (`A-8` a `A-11`):
+- solo se compromete la semana siguiente;
+- cuentan `Run` y `TrailRun`;
+- revocar el acceso a Strava cuenta como no cumplir;
+- el ensayo de 1 hora se hace con carreras reales en Strava. Era la opción no recomendada, pero es la más fiel a "Strava
+  es la única fuente de verdad".
+
+Aprobó además `A-1` a `A-7` como estaban, y que `pnpm release-stale` pida confirmación.
+
+**Riesgos que quedan anotados.**
+- **Reinicio de testnet:** Stellar testnet se reinicia el 16-dic-2026, y la semana real de 7 días va antes.
+- **Términos de Strava:** antes del piloto con terceros conviene consultar a Strava.
+
+**Pendiente para cerrar T3 y la Fase 0.**
+- Push, PR y merge con el OK del usuario.
+- El tag `v0.0.1`, con su permiso.
+
