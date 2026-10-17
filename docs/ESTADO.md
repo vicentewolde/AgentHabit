@@ -31,13 +31,16 @@ liquidador, en `dry-run` primero.
 | T5 Strava, API y km de la semana | ✅ terminada, con un pendiente: pruebas con la cuenta real de Strava | [PR #12](https://github.com/vicentewolde/AgentHabit/pull/12) |
 | **T6a** Contratos vivos en Stellar (adaptador y despliegue de producción) | ✅ terminada: contrato de producción desplegado el 17-oct | [PR #13](https://github.com/vicentewolde/AgentHabit/pull/13) y su PR de cierre |
 | **T7a** Web mínima, solo Stellar | 🔨 en curso, hasta el mié 21 | |
-| **T8a** Publicación en Render | ⏳ hasta el jue 22 | |
+| **T8a** Publicación en Render | 🔨 `render.yaml` y la guía listos; falta publicar, hasta el jue 22 | `cc/t8a-render` |
 | T6b Liquidación, Cron, Avalanche e instancia de ensayo | ⏳ **mié 4-nov, 03:00 UTC** | |
 | T7b Web: historial, meta sugerida, Avalanche | ⏳ después | |
 | T8b Ensayo de punta a punta | ⏳ después | |
 | T9 `/fase-cerrar 1` | ⏳ pendiente | |
 
 ## Pendientes del usuario
+
+- **Para publicar en Render (T8a):** seguir [`PUBLICAR-EN-RENDER.md`](fase-1-mvp-testnet/PUBLICAR-EN-RENDER.md).
+  Necesita que el contrato esté desplegado y T6a y T7a en `main`. Los valores secretos los pegas tú en Render.
 
 - Agregar Foundry al `PATH`, por ejemplo con
   `echo 'export PATH="$PATH:$HOME/.foundry/bin"' >> ~/.zshrc`, porque el instalador no lo hizo.
