@@ -7,7 +7,7 @@ import { Button, ExplorerLink, Notice } from "./ui.js";
 
 type Result =
   | { readonly kind: "none" }
-  | { readonly kind: "working" }
+  | { readonly kind: "working"; readonly waiting: boolean }
   | { readonly kind: "error"; readonly message: string }
   | {
       readonly kind: "done";
@@ -21,18 +21,22 @@ export function ReleaseBox(props: {
   readonly instance: InstanceInfo;
   readonly onDone: () => void;
 }) {
-  const { api, wallet, session } = useApp();
+  const { api, wallet, session, poll } = useApp();
   const [result, setResult] = useState<Result>({ kind: "none" });
 
   const onClick = async () => {
     if (session === null) return;
-    setResult({ kind: "working" });
+    setResult({ kind: "working", waiting: false });
     try {
       const outcome = await runRelease({
         api,
         wallet,
         address: session.address,
         weekId: props.weekId,
+        poll,
+        onStep: (step) => {
+          if (step === "confirming") setResult({ kind: "working", waiting: true });
+        },
       });
       setResult({ kind: "done", status: outcome.status, hash: outcome.txHash });
     } catch (error) {
@@ -66,7 +70,11 @@ export function ReleaseBox(props: {
         </Button>
       ) : (
         <Button onClick={onClick} disabled={result.kind === "working" || session === null}>
-          {result.kind === "working" ? "Esperando tu firma…" : "Recuperar mi depósito"}
+          {result.kind === "working"
+            ? result.waiting
+              ? "Esperando la confirmación…"
+              : "Esperando tu firma…"
+            : "Recuperar mi depósito"}
         </Button>
       )}
     </div>

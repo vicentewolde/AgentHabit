@@ -18,6 +18,7 @@ const STEP_TEXT: Record<CommitStep, string> = {
   preparing: "Preparando la transacción…",
   signing: "Esperando tu firma en Freighter…",
   sending: "Enviando a la red de Stellar. Puede tardar hasta 30 segundos…",
+  confirming: "Esperando la confirmación de la red. Puede tardar hasta un minuto…",
   recording: "Registrando tu compromiso…",
 };
 
@@ -28,7 +29,7 @@ export function CommitForm(props: {
   readonly stravaConnected: boolean;
   readonly onDone: () => void;
 }) {
-  const { api, wallet, session } = useApp();
+  const { api, wallet, session, poll } = useApp();
   const { instance } = props;
   const amountId = useId();
   const goalId = useId();
@@ -69,6 +70,7 @@ export function CommitForm(props: {
         instance,
         amount,
         goalM,
+        poll,
         onStep: (step) => setPhase({ kind: "working", step }),
       });
       if (outcome.status === "FAILED") {

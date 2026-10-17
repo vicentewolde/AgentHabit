@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { type ApiClient, createApiClient } from "./api/client.js";
-import { linkWallet } from "./flows.js";
+import { linkWallet, type PollOptions } from "./flows.js";
 import { clearSession, loadSession, saveSession } from "./session.js";
 import type { WalletPort } from "./wallet/port.js";
 
@@ -20,12 +20,15 @@ export interface AppDeps {
   readonly fetch?: typeof fetch;
   /** Sends the browser to another site (Strava's authorization page). */
   readonly redirect: (url: string) => void;
+  /** How long to wait on a PENDING transaction; tests shorten it. */
+  readonly poll?: PollOptions;
 }
 
 interface AppState {
   readonly api: ApiClient;
   readonly wallet: WalletPort;
   readonly redirect: (url: string) => void;
+  readonly poll: PollOptions | undefined;
   readonly session: VerifyResponse | null;
   /** The session ended by itself (a 401), as opposed to the user never having linked. */
   readonly sessionLost: boolean;
@@ -76,12 +79,13 @@ export function AppProvider(props: { readonly deps: AppDeps; readonly children: 
       api,
       wallet: deps.wallet,
       redirect: deps.redirect,
+      poll: deps.poll,
       session,
       sessionLost,
       link,
       logout: () => dropSession(false),
     }),
-    [api, deps.wallet, deps.redirect, session, sessionLost, link, dropSession],
+    [api, deps.wallet, deps.redirect, deps.poll, session, sessionLost, link, dropSession],
   );
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;

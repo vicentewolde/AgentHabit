@@ -1,4 +1,4 @@
-import type { InstanceInfo, VerifyResponse } from "@agenthabit/core";
+import { hasErrorCode, type InstanceInfo, type VerifyResponse } from "@agenthabit/core";
 import type { ApiClient } from "./api/client.js";
 import { clearPendingCommit, loadPendingCommit, savePendingCommit } from "./session.js";
 import type { WalletPort } from "./wallet/port.js";
@@ -20,7 +20,41 @@ export async function linkWallet(deps: {
   return deps.api.verify(challenge.nonce, signature);
 }
 
-export type CommitStep = "preparing" | "signing" | "sending" | "recording";
+export type CommitStep = "preparing" | "signing" | "sending" | "confirming" | "recording";
+
+export interface PollOptions {
+  readonly intervalMs: number;
+  readonly timeoutMs: number;
+  /** Injected for tests. */
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
+/** After `/tx/submit` answers PENDING: ask `GET /tx/{hash}` every 3 s for up to 60 s. */
+export const DEFAULT_POLL: PollOptions = { intervalMs: 3000, timeoutMs: 60_000 };
+
+/**
+ * Waits for a submitted transaction to leave PENDING. A transient failure of the status call is
+ * not fatal (the next try may work); a lost session is. Still PENDING at the deadline stays
+ * PENDING: the caller then asks the user to refresh in a minute.
+ */
+export async function waitForTx(
+  api: ApiClient,
+  txHash: string,
+  poll: PollOptions = DEFAULT_POLL,
+): Promise<"SUCCESS" | "FAILED" | "PENDING"> {
+  const sleep = poll.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
+  const tries = Math.max(1, Math.floor(poll.timeoutMs / Math.max(1, poll.intervalMs)));
+  for (let attempt = 0; attempt < tries; attempt++) {
+    await sleep(poll.intervalMs);
+    try {
+      const { status } = await api.txStatus(txHash);
+      if (status !== "PENDING") return status;
+    } catch (error) {
+      if (hasErrorCode(error, "Unauthenticated")) throw error;
+    }
+  }
+  return "PENDING";
+}
 
 export interface TxOutcome {
   readonly status: "SUCCESS" | "FAILED" | "PENDING";
@@ -38,6 +72,7 @@ export interface CommitRequest {
   readonly amount: bigint;
   readonly goalM: number;
   readonly onStep?: (step: CommitStep) => void;
+  readonly poll?: PollOptions;
 }
 
 /**
@@ -59,7 +94,12 @@ export async function runCommit(request: CommitRequest): Promise<TxOutcome> {
 
   request.onStep?.("sending");
   const sent = await api.submit(signedXdr);
-  if (sent.status === "FAILED") {
+  let status = sent.status;
+  if (status === "PENDING") {
+    request.onStep?.("confirming");
+    status = await waitForTx(api, sent.txHash, request.poll);
+  }
+  if (status === "FAILED") {
     return { status: "FAILED", txHash: sent.txHash, mirrored: false };
   }
 
@@ -69,7 +109,7 @@ export async function runCommit(request: CommitRequest): Promise<TxOutcome> {
     weekId: prepared.weekId,
     txHash: sent.txHash,
   };
-  if (sent.status === "PENDING") {
+  if (status === "PENDING") {
     savePendingCommit({ ...report, address });
     return { status: "PENDING", txHash: sent.txHash, mirrored: false };
   }
@@ -94,6 +134,8 @@ export interface ReleaseRequest {
   readonly wallet: WalletPort;
   readonly address: string;
   readonly weekId: string;
+  readonly onStep?: (step: CommitStep) => void;
+  readonly poll?: PollOptions;
 }
 
 /** "Recuperar": `release_if_stale` for a week whose window has passed, signed by the wallet. */
@@ -105,7 +147,12 @@ export async function runRelease(request: ReleaseRequest): Promise<TxOutcome> {
     request.address,
   );
   const sent = await request.api.submit(signedXdr);
-  return { status: sent.status, txHash: sent.txHash, mirrored: false };
+  let status = sent.status;
+  if (status === "PENDING") {
+    request.onStep?.("confirming");
+    status = await waitForTx(request.api, sent.txHash, request.poll);
+  }
+  return { status, txHash: sent.txHash, mirrored: false };
 }
 
 export type ReconcileResult = "none" | "mirrored" | "waiting";
