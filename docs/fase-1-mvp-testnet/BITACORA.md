@@ -14,8 +14,8 @@
 ## Estado actual
 
 **Fecha:** 2026-10-17 · **Fase en curso** desde el cierre de la Fase 0 (`v0.0.1`). Spec **Aprobado** en T3.
-T4 terminada ([PR #11](https://github.com/vicentewolde/AgentHabit/pull/11)). T5 implementada en `cc/t5-strava-api-km`,
-en revisión. La prueba con la cuenta real de Strava queda del lado del usuario. Siguiente: `/revisar`, y después T6.
+T4 y T5 terminadas ([PR #11](https://github.com/vicentewolde/AgentHabit/pull/11) y [PR #12](https://github.com/vicentewolde/AgentHabit/pull/12)). T5 se cerró sin las
+pruebas con la cuenta real de Strava, por decisión del usuario: sigue pendiente su suscripción. Siguiente: T6.
 
 ## Progreso
 
@@ -24,7 +24,7 @@ Tareas agrupadas el 16-oct para ganar velocidad (equivalencias en el registro de
 | Tarea | Estado |
 |---|---|
 | T4 Núcleo y contratos | ✅ terminada |
-| T5 Strava, API y km de la semana | 👀 en revisión |
+| T5 Strava, API y km de la semana | ✅ terminada, con un pendiente |
 | T6 Despliegue en testnet y liquidación | ⏳ pendiente |
 | T7 Web | ⏳ pendiente |
 | T8 Ensayo de punta a punta y publicación en Render | ⏳ pendiente |
@@ -160,5 +160,25 @@ Y sugerencias:
 - la purga de desafíos y sesiones vencidos.
 
 El importante que queda abierto es la prueba con la cuenta real, del lado del usuario.
+
+**Cierre.** [PR #12](https://github.com/vicentewolde/AgentHabit/pull/12), con los tres jobs de CI en verde sobre `54674ed`, y merge por fast-forward a `main` el 17-oct.
+
+**Cerrada con un pendiente explícito.** El usuario decidió cerrar T5 sin las pruebas con su cuenta real de Strava:
+su cuenta es gratuita, y el panel de la API muestra "The Strava API is available to subscribers" con el botón
+de crear deshabilitado. Lo que se perdió de verificar, y por qué importa:
+- **El cuerpo del error de un token revocado.** La regla de `A-17` se escribió sobre la forma documentada, no sobre
+  una respuesta medida. Si Strava responde distinto, una revocación real no se detectaría y la lectura solo se
+  saltaría. Falla del lado seguro: nunca castiga al usuario.
+- **El máximo de `per_page` y si cada página cuenta como una lectura.** Hoy se piden páginas de 30 y se lee hasta
+  una página vacía, que funciona con cualquier máximo.
+- **`device_name` y `upload_id` en carreras con Garmin.** Si vinieran vacíos, esas carreras no contarían y el
+  usuario perdería su depósito sin haber fallado: es el riesgo que más importa y hay que medirlo antes del ensayo
+  de T8, no más tarde.
+- **El formato del `scope` en el redirect y los bordes de `after` y `before`.** El cliente acepta coma o espacio y
+  aplica la ventana exacta por su cuenta, así que los dos están cubiertos.
+
+Neon sí quedó listo: el proyecto `agenthabit` existe en AWS São Paulo y el usuario dice que puso sus valores en `.env.local`
+(no se pudo comprobar).
+Falta aplicar las migraciones con `pnpm run db:migrate`, ya con el código en `main`.
 
 **Evidencia.** [`evidencia/T5.md`](evidencia/T5.md).
