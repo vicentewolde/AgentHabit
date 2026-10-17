@@ -192,6 +192,35 @@ describe("commit", () => {
   });
 });
 
+describe("contract refusals explain themselves", () => {
+  async function commitUntilRefused(scenario: "no-usdc" | "no-trustline") {
+    const harness = makeHarness({ scenario });
+    const user = userEvent.setup();
+    mount(harness);
+    await signIn(user);
+    await user.type(await screen.findByLabelText("Monto a bloquear (USDC)"), "25");
+    await user.type(screen.getByLabelText("Meta de la semana (km)"), "15");
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    await user.click(await screen.findByRole("button", { name: "Entiendo, firmar y bloquear" }));
+    return screen.findByRole("alert");
+  }
+
+  it("says there is no USDC and links to the Circle faucet", async () => {
+    const alert = await commitUntilRefused("no-usdc");
+    expect(alert.textContent).toContain("No tienes suficiente USDC de prueba en esta wallet");
+    const link = within(alert).getByRole("link", { name: "Abrir el faucet de Circle" });
+    expect(link.getAttribute("href")).toBe("https://faucet.circle.com/");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noreferrer noopener");
+  });
+
+  it("says the wallet cannot hold USDC yet and links to the faucet", async () => {
+    const alert = await commitUntilRefused("no-trustline");
+    expect(alert.textContent).toContain("Tu wallet todavía no puede guardar USDC");
+    expect(within(alert).getByRole("link", { name: "Abrir el faucet de Circle" })).toBeTruthy();
+  });
+});
+
 describe("a commit that cannot be lost", () => {
   it("asks to confirm again, and signs nothing, when the week changed under the user", async () => {
     let clock = Date.now();

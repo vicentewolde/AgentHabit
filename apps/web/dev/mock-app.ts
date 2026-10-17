@@ -57,6 +57,8 @@ export const SCENARIOS = [
   },
   { name: "expired", label: "Semana anterior sin liquidar y vencida: aparece el botón Recuperar" },
   { name: "unregistered", label: "Compromiso en la cadena pero sin hash registrado (aviso)" },
+  { name: "no-usdc", label: "Con Strava, y el contrato rechaza: InsufficientBalance (sin USDC)" },
+  { name: "no-trustline", label: "Con Strava, y el contrato rechaza: NoUsdcTrustline" },
   { name: "tx-failed", label: "Con Strava, y /tx/submit responde FAILED" },
   {
     name: "tx-pending",
@@ -210,8 +212,8 @@ export function createMockApp(options: MockOptions = {}): Hono {
   const app = new Hono();
   app.use("*", cors({ origin: webOrigin, allowHeaders: ["Authorization", "Content-Type"] }));
 
-  function fail(c: Context, code: string, status: ContentfulStatusCode) {
-    return c.json({ error: code }, status);
+  function fail(c: Context, code: string, status: ContentfulStatusCode, reason?: string) {
+    return c.json(reason === undefined ? { error: code } : { error: code, reason }, status);
   }
 
   /** Sends `data` only after the contract's schema accepts it: a mock bug throws, not lies. */
@@ -376,16 +378,19 @@ export function createMockApp(options: MockOptions = {}): Hono {
     const body = await readBody(c, BuildCommitRequestSchema);
     if (body === null) return fail(c, "InvalidRequest", 400);
     const amount = BigInt(body.amount);
-    if (
-      amount < BigInt(instance.minAmount) ||
-      amount > BigInt(instance.maxAmount) ||
-      body.goalM < instance.minGoalM ||
-      body.goalM > instance.maxGoalM
-    ) {
-      return fail(c, "ContractRejected", 422);
+    if (amount < BigInt(instance.minAmount) || amount > BigInt(instance.maxAmount)) {
+      return fail(c, "ContractRejected", 422, "AmountOutOfRange");
+    }
+    if (body.goalM < instance.minGoalM || body.goalM > instance.maxGoalM) {
+      return fail(c, "ContractRejected", 422, "GoalOutOfRange");
     }
     const { next } = ids();
-    if (state.positions.has(next)) return fail(c, "ContractRejected", 422);
+    if (state.positions.has(next)) return fail(c, "ContractRejected", 422, "AlreadyCommitted");
+    if (state.scenario === "no-usdc")
+      return fail(c, "ContractRejected", 422, "InsufficientBalance");
+    if (state.scenario === "no-trustline") {
+      return fail(c, "ContractRejected", 422, "NoUsdcTrustline");
+    }
     return reply(
       c,
       PreparedTxResponseSchema,
@@ -400,9 +405,9 @@ export function createMockApp(options: MockOptions = {}): Hono {
     if (body === null) return fail(c, "InvalidRequest", 400);
     const position = state.positions.get(body.weekId);
     const releaseMs = ANCHOR_MS + (Number(body.weekId) + 1) * WEEK_MS + 9 * DAY_MS;
-    if (position?.state !== "Active" || releaseMs > ids().nowMs) {
-      return fail(c, "ContractRejected", 422);
-    }
+    if (position === undefined) return fail(c, "ContractRejected", 422, "PositionNotFound");
+    if (position.state !== "Active") return fail(c, "ContractRejected", 422, "PositionNotActive");
+    if (releaseMs > ids().nowMs) return fail(c, "ContractRejected", 422, "NotStaleYet");
     return reply(
       c,
       PreparedTxResponseSchema,

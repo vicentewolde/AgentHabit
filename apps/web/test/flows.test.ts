@@ -2,7 +2,7 @@
 import { AgentHabitError, hasErrorCode } from "@agenthabit/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "../src/api/client.js";
-import { messageFor } from "../src/api/messages.js";
+import { messageFor, reasonOf } from "../src/api/messages.js";
 import { isWebError } from "../src/errors.js";
 import {
   linkWallet,
@@ -268,11 +268,12 @@ describe("commit flow", () => {
     expect(t.wallet.signedXdrs).toHaveLength(0);
   });
 
-  it("maps a contract rejection from the API to a friendly sentence", async () => {
+  it("maps a contract rejection with its reason to a friendly sentence", async () => {
     const t = setup();
     await t.login();
     const failure = await t.api.buildCommit({ amount: "1", goalM: 5000 }).catch((e: unknown) => e);
-    expect(messageFor(failure)).toContain("El contrato no aceptó la operación");
+    expect(reasonOf(failure)).toBe("AmountOutOfRange");
+    expect(messageFor(failure)).toContain("fuera de los límites");
   });
 });
 

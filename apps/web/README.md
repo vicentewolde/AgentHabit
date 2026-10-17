@@ -32,7 +32,9 @@ MOCK_SCENARIO=active pnpm run web:mock-api
 ```
 
 Scenarios: `fresh`, `no-position`, `active`, `waiting-settlement`, `expired`, `unregistered`,
-`tx-failed`, `tx-pending`, `tx-stuck`, `session-expired`.
+`no-usdc` and `no-trustline` (the contract refuses with `InsufficientBalance` or
+`NoUsdcTrustline`, and the error shows the Circle faucet link), `tx-failed`, `tx-pending`,
+`tx-stuck`, `session-expired`.
 
 ## Build
 
