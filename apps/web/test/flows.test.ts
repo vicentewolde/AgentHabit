@@ -3,10 +3,20 @@ import { AgentHabitError, hasErrorCode } from "@agenthabit/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "../src/api/client.js";
 import { messageFor } from "../src/api/messages.js";
-import { linkWallet, reconcilePendingCommit, runCommit, runRelease } from "../src/flows.js";
+import {
+  linkWallet,
+  type PollOptions,
+  reconcilePendingCommit,
+  runCommit,
+  runRelease,
+  waitForTx,
+} from "../src/flows.js";
 import { loadPendingCommit } from "../src/session.js";
 import { WalletError } from "../src/wallet/port.js";
 import { BASE_URL, makeHarness } from "./helpers.js";
+
+/** Ten instant tries instead of 20 waits of 3 s. */
+const FAST_POLL: PollOptions = { intervalMs: 1, timeoutMs: 10, sleep: async () => undefined };
 
 beforeEach(() => {
   window.sessionStorage.clear();
@@ -117,8 +127,29 @@ describe("commit flow", () => {
     expect((await t.api.weeks()).nextWeek.position).toBeNull();
   });
 
-  it("keeps a PENDING hash and reports it on later loads until the API accepts it", async () => {
+  it("polls GET /tx/{hash} after PENDING and carries on when it lands", async () => {
     const t = setup({ scenario: "tx-pending" });
+    const session = await t.login();
+    const { instance } = await t.api.weeks();
+    const steps: string[] = [];
+    const outcome = await runCommit({
+      api: t.api,
+      wallet: t.wallet,
+      address: session.address,
+      instance,
+      amount: 200_000_000n,
+      goalM: 5000,
+      poll: FAST_POLL,
+      onStep: (step) => steps.push(step),
+    });
+    expect(outcome).toMatchObject({ status: "SUCCESS", mirrored: true });
+    expect(steps).toContain("confirming");
+    expect(loadPendingCommit()).toBeNull();
+    expect((await t.api.weeks()).nextWeek.position?.commitTxHash).toBe(outcome.txHash);
+  });
+
+  it("falls back to PENDING after the polling window and keeps the hash for later", async () => {
+    const t = setup({ scenario: "tx-stuck" });
     const session = await t.login();
     const { instance } = await t.api.weeks();
     const outcome = await runCommit({
@@ -128,16 +159,13 @@ describe("commit flow", () => {
       instance,
       amount: 200_000_000n,
       goalM: 5000,
+      poll: FAST_POLL,
     });
     expect(outcome.status).toBe("PENDING");
     expect(loadPendingCommit()?.txHash).toBe(outcome.txHash);
-
-    // The mock cannot see it on the first report, then can.
+    // Still unseen on-chain: the retry stays queued instead of dropping the hash.
     expect(await reconcilePendingCommit({ api: t.api, address: session.address })).toBe("waiting");
     expect(loadPendingCommit()).not.toBeNull();
-    expect(await reconcilePendingCommit({ api: t.api, address: session.address })).toBe("mirrored");
-    expect(loadPendingCommit()).toBeNull();
-    expect((await t.api.weeks()).nextWeek.position?.commitTxHash).toBe(outcome.txHash);
   });
 
   it("keeps the hash when the position report fails after a SUCCESS", async () => {
@@ -187,7 +215,7 @@ describe("commit flow", () => {
     const t = setup();
     await t.login();
     const failure = await t.api.buildCommit({ amount: "1", goalM: 5000 }).catch((e: unknown) => e);
-    expect(messageFor(failure)).toContain("El contrato rechazó la operación");
+    expect(messageFor(failure)).toContain("El contrato no aceptó la operación");
   });
 });
 
@@ -195,15 +223,19 @@ describe("release flow", () => {
   it("builds, signs and submits the release of an expired week", async () => {
     const t = setup({ scenario: "expired" });
     const session = await t.login();
-    const { currentWeek } = await t.api.weeks();
+    const { unsettledWeeks } = await t.api.weeks();
+    expect(unsettledWeeks).toHaveLength(1);
+    const week = unsettledWeeks[0];
+    if (week === undefined) throw new Error("unreachable");
+    expect(Date.parse(week.releaseOpensAt)).toBeLessThan(Date.now());
     const outcome = await runRelease({
       api: t.api,
       wallet: t.wallet,
       address: session.address,
-      weekId: currentWeek.weekId,
+      weekId: week.weekId,
     });
     expect(outcome.status).toBe("SUCCESS");
-    expect((await t.api.weeks()).currentWeek.position?.state).toBe("ReleasedStale");
+    expect((await t.api.weeks()).unsettledWeeks).toHaveLength(0);
   });
 });
 
@@ -250,5 +282,51 @@ describe("401 handling in the client", () => {
       onUnauthorized: () => undefined,
     });
     expect(messageFor(await notReady.weeks().catch((e: unknown) => e))).toContain("no está listo");
+  });
+});
+
+describe("waitForTx", () => {
+  it("keeps asking through a failed status call and stops on a final status", async () => {
+    const answers = ["boom", "PENDING", "SUCCESS"];
+    const api = {
+      txStatus: async (txHash: string) => {
+        const next = answers.shift();
+        if (next === "boom") throw new AgentHabitError("NetworkError", "down");
+        return { txHash, status: next as "PENDING" | "SUCCESS" };
+      },
+    } as unknown as Parameters<typeof waitForTx>[0];
+    expect(await waitForTx(api, "a".repeat(64), FAST_POLL)).toBe("SUCCESS");
+    expect(answers).toHaveLength(0);
+  });
+
+  it("gives up with PENDING at the deadline, asking every interval", async () => {
+    let asked = 0;
+    const api = {
+      txStatus: async (txHash: string) => {
+        asked++;
+        return { txHash, status: "PENDING" as const };
+      },
+    } as unknown as Parameters<typeof waitForTx>[0];
+    const sleeps: number[] = [];
+    const outcome = await waitForTx(api, "a".repeat(64), {
+      intervalMs: 3000,
+      timeoutMs: 60_000,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    expect(outcome).toBe("PENDING");
+    expect(asked).toBe(20);
+    expect(new Set(sleeps)).toEqual(new Set([3000]));
+  });
+
+  it("stops at once when the session is lost", async () => {
+    const api = {
+      txStatus: async () => {
+        throw new AgentHabitError("Unauthenticated", "gone");
+      },
+    } as unknown as Parameters<typeof waitForTx>[0];
+    const failure = await waitForTx(api, "a".repeat(64), FAST_POLL).catch((e: unknown) => e);
+    expect(hasErrorCode(failure, "Unauthenticated")).toBe(true);
   });
 });

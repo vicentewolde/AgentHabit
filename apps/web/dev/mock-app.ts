@@ -51,13 +51,18 @@ export const SCENARIOS = [
   { name: "fresh", label: "Usuario nuevo: sin Strava y sin compromiso" },
   { name: "no-position", label: "Con Strava, sin compromiso (el flujo de comprometer funciona)" },
   { name: "active", label: "Compromiso activo, con kilómetros leídos" },
-  { name: "expired", label: "Semana vencida: aparece el botón Recuperar" },
+  {
+    name: "waiting-settlement",
+    label: "Semana anterior sin liquidar, todavía dentro de la espera del oráculo",
+  },
+  { name: "expired", label: "Semana anterior sin liquidar y vencida: aparece el botón Recuperar" },
   { name: "unregistered", label: "Compromiso en la cadena pero sin hash registrado (aviso)" },
   { name: "tx-failed", label: "Con Strava, y /tx/submit responde FAILED" },
   {
     name: "tx-pending",
-    label: "Con Strava, y /tx/submit responde PENDING (se registra al 2.º intento)",
+    label: "Con Strava, /tx/submit responde PENDING y GET /tx/{hash} confirma al 3.er sondeo",
   },
+  { name: "tx-stuck", label: "Con Strava, y la transacción queda PENDING para siempre" },
   { name: "session-expired", label: "Toda llamada con sesión responde 401" },
 ] as const;
 export type ScenarioName = (typeof SCENARIOS)[number]["name"];
@@ -78,10 +83,11 @@ interface MockState {
   scenario: ScenarioName;
   stravaConnected: boolean;
   positions: Map<string, MockPosition>;
-  /** For the "expired" scenario the current week is shifted into the past. */
-  weekShiftMs: number;
   totalM: number | null;
-  reportAttempts: Map<string, number>;
+  /** Submitted transactions still PENDING, with how many times they were asked about. */
+  pendingTxs: Map<string, { note: string; address: string; polls: number }>;
+  /** Hashes whose outcome is final. */
+  finishedTxs: Map<string, "SUCCESS" | "FAILED">;
   /** Transactions the mock "confirmed", by hash: what the position report is checked against. */
   confirmed: Map<string, { weekId: string; address: string }>;
 }
@@ -125,9 +131,9 @@ function initialState(scenario: ScenarioName, nowMs: number): MockState {
     scenario,
     stravaConnected: scenario !== "fresh",
     positions: new Map(),
-    weekShiftMs: 0,
     totalM: null,
-    reportAttempts: new Map(),
+    pendingTxs: new Map(),
+    finishedTxs: new Map(),
     confirmed: new Map(),
   };
   const currentId = weekIdAt(nowMs);
@@ -149,15 +155,18 @@ function initialState(scenario: ScenarioName, nowMs: number): MockState {
       commitTxHash: null,
     });
   }
+  const earlier = {
+    state: "Active" as const,
+    amount: usdcToUnits(30n, "stellar").toString(),
+    goalM: 20_000,
+    commitTxHash: fakeHash,
+  };
+  if (scenario === "waiting-settlement") {
+    state.positions.set(pad(Number(currentId) - 1), { ...earlier });
+  }
   if (scenario === "expired") {
-    // Three weeks back, so its release window (end + 9 days) opened five days ago.
-    state.weekShiftMs = -3 * WEEK_MS;
-    state.positions.set(weekIdAt(nowMs + state.weekShiftMs), {
-      state: "Active",
-      amount: usdcToUnits(30n, "stellar").toString(),
-      goalM: 20_000,
-      commitTxHash: fakeHash,
-    });
+    // Three weeks back: its release window (end + 9 days) opened five days ago.
+    state.positions.set(pad(Number(currentId) - 3), { ...earlier });
   }
   return state;
 }
@@ -226,8 +235,7 @@ export function createMockApp(options: MockOptions = {}): Hono {
 
   const ids = () => {
     const nowMs = now().getTime();
-    const currentMs = nowMs + state.weekShiftMs;
-    const current = weekIdAt(currentMs);
+    const current = weekIdAt(nowMs);
     return { nowMs, current, next: pad(Number(current) + 1) };
   };
 
@@ -342,6 +350,11 @@ export function createMockApp(options: MockOptions = {}): Hono {
       instance,
       currentWeek: weekView(current, state, state.positions.get(current), nowMs, true),
       nextWeek: weekView(next, state, state.positions.get(next), nowMs, false),
+      // Earlier weeks whose position is still Active, newest first.
+      unsettledWeeks: [...state.positions.entries()]
+        .filter(([id, position]) => Number(id) < Number(current) && position.state === "Active")
+        .sort(([a], [b]) => Number(b) - Number(a))
+        .map(([id, position]) => weekView(id, state, position, nowMs, false)),
     });
   });
 
@@ -397,6 +410,25 @@ export function createMockApp(options: MockOptions = {}): Hono {
     );
   });
 
+  /** What a confirmed transaction does on-chain; the API only learns a hash from /positions. */
+  function applyTx(note: string, address: string, txHash: string) {
+    const [action, ...rest] = note.split(":");
+    if (action === "commit") {
+      const [amount, goalM, weekId] = rest;
+      if (amount === undefined || goalM === undefined || weekId === undefined) return;
+      state.confirmed.set(txHash, { weekId, address });
+      state.positions.set(weekId, {
+        state: "Active",
+        amount,
+        goalM: Number(goalM),
+        commitTxHash: null,
+      });
+    } else if (action === "release") {
+      const position = state.positions.get(rest[0] ?? "");
+      if (position !== undefined) position.state = "ReleasedStale";
+    }
+  }
+
   app.post("/tx/submit", async (c) => {
     const session = sessionAddress(c);
     if (session === null) return fail(c, "Unauthenticated", 401);
@@ -426,32 +458,40 @@ export function createMockApp(options: MockOptions = {}): Hono {
     }
 
     if (state.scenario === "tx-failed") {
+      state.finishedTxs.set(txHash, "FAILED");
       return reply(c, SubmitTxResponseSchema, { txHash, status: "FAILED" });
     }
 
-    const [action, ...rest] = note.split(":");
-    if (action === "commit") {
-      const [amount, goalM, weekId] = rest;
-      if (amount === undefined || goalM === undefined || weekId === undefined) {
-        return fail(c, "InvalidRequest", 400);
-      }
-      state.confirmed.set(txHash, { weekId, address: session.address });
-      if (state.scenario !== "tx-pending") {
-        // On-chain from now on; the API only learns the hash when the web reports it.
-        state.positions.set(weekId, {
-          state: "Active",
-          amount,
-          goalM: Number(goalM),
-          commitTxHash: null,
-        });
-      }
-    } else if (action === "release") {
-      const weekId = rest[0] ?? "";
-      const position = state.positions.get(weekId);
-      if (position !== undefined) position.state = "ReleasedStale";
+    if (state.scenario === "tx-pending" || state.scenario === "tx-stuck") {
+      state.pendingTxs.set(txHash, { note, address: session.address, polls: 0 });
+      return reply(c, SubmitTxResponseSchema, { txHash, status: "PENDING" });
     }
-    const status = state.scenario === "tx-pending" ? "PENDING" : "SUCCESS";
-    return reply(c, SubmitTxResponseSchema, { txHash, status });
+    applyTx(note, session.address, txHash);
+    state.finishedTxs.set(txHash, "SUCCESS");
+    return reply(c, SubmitTxResponseSchema, { txHash, status: "SUCCESS" });
+  });
+
+  /** `GET /tx/{hash}`: PENDING until the scenario lets it land. */
+  app.get("/tx/:hash", (c) => {
+    const session = sessionAddress(c);
+    if (session === null) return fail(c, "Unauthenticated", 401);
+    const hash = c.req.param("hash");
+    if (!/^[0-9a-f]{64}$/.test(hash)) return fail(c, "InvalidRequest", 400);
+    const pending = state.pendingTxs.get(hash);
+    if (pending !== undefined) {
+      pending.polls += 1;
+      if (state.scenario === "tx-pending" && pending.polls >= 3) {
+        applyTx(pending.note, pending.address, hash);
+        state.pendingTxs.delete(hash);
+        state.finishedTxs.set(hash, "SUCCESS");
+        return reply(c, SubmitTxResponseSchema, { txHash: hash, status: "SUCCESS" });
+      }
+      return reply(c, SubmitTxResponseSchema, { txHash: hash, status: "PENDING" });
+    }
+    return reply(c, SubmitTxResponseSchema, {
+      txHash: hash,
+      status: state.finishedTxs.get(hash) ?? "FAILED",
+    });
   });
 
   app.post("/positions", async (c) => {
@@ -462,20 +502,6 @@ export function createMockApp(options: MockOptions = {}): Hono {
     const known = state.confirmed.get(body.txHash);
     if (known === undefined || known.weekId !== body.weekId || known.address !== session.address) {
       return fail(c, "PositionUnverified", 422);
-    }
-    if (state.scenario === "tx-pending") {
-      // The ledger "catches up" on the second report; the first ones cannot see it yet.
-      const attempts = (state.reportAttempts.get(body.txHash) ?? 0) + 1;
-      state.reportAttempts.set(body.txHash, attempts);
-      if (attempts < 2) return fail(c, "PositionUnverified", 422);
-      if (!state.positions.has(body.weekId)) {
-        state.positions.set(body.weekId, {
-          state: "Active",
-          amount: usdcToUnits(25n, "stellar").toString(),
-          goalM: 15_000,
-          commitTxHash: null,
-        });
-      }
     }
     const position = state.positions.get(body.weekId);
     if (position === undefined) return fail(c, "PositionUnverified", 422);

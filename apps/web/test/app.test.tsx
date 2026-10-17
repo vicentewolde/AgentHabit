@@ -13,7 +13,13 @@ function mount(
 ) {
   return render(
     <AppProvider
-      deps={{ baseUrl: BASE_URL, wallet: harness.wallet, fetch: harness.fetch, redirect }}
+      deps={{
+        baseUrl: BASE_URL,
+        wallet: harness.wallet,
+        fetch: harness.fetch,
+        redirect,
+        poll: { intervalMs: 1, timeoutMs: 20, sleep: async () => undefined },
+      }}
     >
       <App returned={takeStravaReturn()} />
     </AppProvider>,
@@ -149,8 +155,20 @@ describe("commit", () => {
     expect(screen.getByRole("button", { name: "Continuar" })).toBeTruthy();
   });
 
-  it("tells the user to refresh when the transaction is still PENDING", async () => {
+  it("waits through PENDING by polling and then confirms the commit", async () => {
     const harness = makeHarness({ scenario: "tx-pending" });
+    const user = userEvent.setup();
+    mount(harness);
+    await signIn(user);
+    await user.type(await screen.findByLabelText("Monto a bloquear (USDC)"), "20");
+    await user.type(screen.getByLabelText("Meta de la semana (km)"), "5");
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    await user.click(await screen.findByRole("button", { name: "Entiendo, firmar y bloquear" }));
+    expect(await screen.findByText(/Listo: bloqueaste 20 USDC/)).toBeTruthy();
+  });
+
+  it("tells the user to refresh when the transaction stays PENDING after the polling", async () => {
+    const harness = makeHarness({ scenario: "tx-stuck" });
     const user = userEvent.setup();
     mount(harness);
     await signIn(user);
@@ -216,9 +234,24 @@ describe("release button", () => {
     await signIn(user);
     await screen.findByRole("progressbar");
     expect(screen.queryByRole("button", { name: "Recuperar mi depósito" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Semanas anteriores sin liquidar" })).toBeNull();
   });
 
-  it("is shown once the release window has passed, and returns the deposit", async () => {
+  it("says an earlier week waits for the oracle, with both dates, and has no button yet", async () => {
+    const harness = makeHarness({ scenario: "waiting-settlement" });
+    const user = userEvent.setup();
+    mount(harness);
+    await signIn(user);
+    expect(
+      await screen.findByRole("heading", { name: "Semanas anteriores sin liquidar" }),
+    ).toBeTruthy();
+    const notice = await screen.findByText(/Esperando la liquidación del oráculo/);
+    expect(notice.textContent).toContain("puede hacerla desde el");
+    expect(notice.textContent).toContain("podrás recuperar tu depósito desde el");
+    expect(screen.queryByRole("button", { name: "Recuperar mi depósito" })).toBeNull();
+  });
+
+  it("is shown for an earlier week once its release window has passed, and returns the deposit", async () => {
     const harness = makeHarness({ scenario: "expired" });
     const user = userEvent.setup();
     mount(harness);
@@ -229,7 +262,8 @@ describe("release button", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Recuperar mi depósito" })).toBeNull(),
     );
-    expect(screen.getByText(/el contrato devolvió tu depósito a tu billetera/)).toBeTruthy();
+    // The week is settled now, so it left the unsettled list.
+    expect(screen.queryByRole("heading", { name: "Semanas anteriores sin liquidar" })).toBeNull();
   });
 
   it("is hidden when there is no position", async () => {

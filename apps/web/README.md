@@ -18,10 +18,10 @@ pnpm run web:mock-api
 pnpm run web:dev
 ```
 
-The web is on http://localhost:5173 and calls `VITE_API_URL` (default `http://localhost:3000`). The
+The web is on http://localhost:5173 (`strictPort`: if something else uses 5173, Vite fails instead of moving, because the web origin is part of the signed message and of Strava's redirect; stop whatever holds the port) and calls `VITE_API_URL` (default `http://localhost:3000`). The
 mock API is dev only (`apps/web/dev/`, never imported by the app) and implements `/config`,
-`/link/*`, `/me`, `/strava/*`, `/weeks/me`, `/tx/commit`, `/tx/release`, `/tx/submit` and
-`/positions` with canned data. It really verifies the SEP-53 signature of the link message and
+`/link/*`, `/me`, `/strava/*`, `/weeks/me` (with `unsettledWeeks`), `/tx/commit`, `/tx/release`,
+`/tx/submit`, `GET /tx/{hash}` and `/positions` with canned data. It really verifies the SEP-53 signature of the link message and
 builds real (harmless `manage_data`) Stellar transactions for the wallet to sign; nothing is sent
 to any network.
 
@@ -31,10 +31,8 @@ Pick the state to click through at http://localhost:3000/__mock, or start with o
 MOCK_SCENARIO=active pnpm run web:mock-api
 ```
 
-Scenarios: `fresh`, `no-position`, `active`, `expired`, `unregistered`, `tx-failed`, `tx-pending`,
-`session-expired`. If port 5173 is taken, Vite picks another one: tell the mock where the web is
-with `WEB_ORIGIN=http://localhost:5174 pnpm run web:mock-api` (CORS and the signed message's
-domain use it).
+Scenarios: `fresh`, `no-position`, `active`, `waiting-settlement`, `expired`, `unregistered`,
+`tx-failed`, `tx-pending`, `tx-stuck`, `session-expired`.
 
 ## Build
 
