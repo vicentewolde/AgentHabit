@@ -25,7 +25,9 @@
     "api:start": "tsx --conditions=@agenthabit/source apps/api/src/server.ts",
     "bootstrap": "tsx --conditions=@agenthabit/source scripts/bootstrap.ts",
     "deploy:stellar": "tsx --conditions=@agenthabit/source scripts/deploy-stellar.ts",
-    "smoke:stellar": "tsx --conditions=@agenthabit/source scripts/smoke-stellar.ts"
+    "smoke:stellar": "tsx --conditions=@agenthabit/source scripts/smoke-stellar.ts",
+    "web:dev": "pnpm --filter @agenthabit/web run dev",
+    "web:mock-api": "pnpm --filter @agenthabit/web run mock-api"
   },
   "devDependencies": {
     "@agenthabit/chain-stellar": "workspace:*",
