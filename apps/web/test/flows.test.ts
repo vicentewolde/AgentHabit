@@ -345,7 +345,52 @@ describe("401 handling in the client", () => {
       onUnauthorized: () => undefined,
     });
     const failure = await api.weeks().catch((error: unknown) => error);
+    // The server answered: this is not a connection failure.
+    expect(isWebError(failure) && failure.code === "ServerResponse").toBe(true);
+    expect(messageFor(failure)).toBe(
+      "El servidor no respondió bien, intenta de nuevo en un minuto.",
+    );
+  });
+
+  it("calls a 5xx with no known code a bad server answer, not a network failure", async () => {
+    const api = createApiClient({
+      baseUrl: BASE_URL,
+      fetch: async () => new Response("<html>Bad gateway</html>", { status: 502 }),
+      getToken: () => "t",
+      onUnauthorized: () => undefined,
+    });
+    const failure = await api.weeks().catch((error: unknown) => error);
+    expect(isWebError(failure) && failure.code === "ServerResponse").toBe(true);
+    expect(isWebError(failure) && failure.status).toBe(502);
+  });
+
+  it("reserves the connection message for real network failures, including a timeout", async () => {
+    const down = createApiClient({
+      baseUrl: BASE_URL,
+      fetch: async () => {
+        throw new TypeError("Failed to fetch");
+      },
+      getToken: () => "t",
+      onUnauthorized: () => undefined,
+    });
+    const failure = await down.weeks().catch((error: unknown) => error);
     expect(hasErrorCode(failure, "NetworkError")).toBe(true);
+    expect(messageFor(failure)).toContain("Revisa tu conexión");
+
+    // A server that never answers: the request is aborted when the timeout passes.
+    const silent = createApiClient({
+      baseUrl: BASE_URL,
+      timeoutMs: 20,
+      fetch: (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("timeout", "TimeoutError")),
+          );
+        }),
+      getToken: () => "t",
+      onUnauthorized: () => undefined,
+    });
+    expect(hasErrorCode(await silent.weeks().catch((e: unknown) => e), "NetworkError")).toBe(true);
   });
 
   it("maps codes the contract does not list yet", async () => {

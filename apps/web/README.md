@@ -40,10 +40,16 @@ Scenarios: `fresh`, `no-position`, `active`, `waiting-settlement`, `expired`, `u
 VITE_API_URL=https://api.example.com pnpm --filter @agenthabit/web build
 ```
 
-The static site lands in `apps/web/dist/site`. The build also writes the Content-Security-Policy
-into `index.html` (as a `<meta>`, with `connect-src` limited to the site and the API origin) and
-into `dist/site/_headers` with the same policy plus `frame-ancestors 'none'`, `nosniff` and
-`no-referrer`. The host must serve `index.html` for every path (`/reglas`, `/strava/callback`).
+`VITE_API_URL` is required for a production build and must be `https:`: the build fails otherwise
+(there is no fallback to localhost). `vite preview` is a production-mode run, so it needs it too.
+
+The static site lands in `apps/web/dist/site`. The build writes the Content-Security-Policy into
+`index.html` as a `<meta>` (with `connect-src` limited to the site and the API origin), which is
+enforced by every host. It also writes `dist/site/_headers` with the same policy plus
+`frame-ancestors 'none'`, `nosniff` and `no-referrer`, but **Render does not read `_headers`** (that
+is a Netlify and Cloudflare Pages feature): on Render the security headers live in `render.yaml`
+(copy the values from the generated `_headers`), and the file is only useful on those other hosts.
+The host must serve `index.html` for every path (`/reglas`, `/strava/callback`).
 
 Note: the wallets kit applies a style rule at load that the policy blocks (one console error); it
 only styles the kit's own modal, which this app does not open.
@@ -57,6 +63,12 @@ pnpm exec vitest run apps/web
 ## Privacy rules the code keeps
 
 - The session token lives in `sessionStorage` only: never in a URL, in `localStorage` or in a log.
+- `localStorage` holds one thing: a signed commit that is not recorded yet (contract, week, signed
+  transaction and its hash, keyed by wallet address). It is public chain data, and it is what makes
+  sure a commit is never lost if the network drops after signing.
+- Before the wallet signs, the transaction must be for the week the user confirmed and for the
+  network `/config` names; otherwise nothing is signed.
+- Dates are shown in UTC-3, the offset the weeks are anchored to, and say so.
 - `/strava/callback` reads `code`, `scope` and `state` once, strips them from the address bar before
   rendering, forwards them with the session, and never logs or stores them.
 - No analytics, no CDN, no web fonts, no third-party requests other than the wallet's own.

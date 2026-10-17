@@ -395,7 +395,11 @@ describe("rules page", () => {
       "Run",
       "TrailRun",
       "7 días como máximo",
-      "Nadie más ve tus datos",
+      "no los ve nadie más",
+      "no se escriben en la cadena",
+      "es público por naturaleza",
+      "explorador de transacciones",
+      "UTC-3",
       "no liquida tu semana",
       "Revocar el acceso de AgentHabit a Strava cuenta como no cumplir",
     ]) {
