@@ -39,7 +39,15 @@ export type AgentHabitErrorCode =
   /** The database answered something its schema rules out. */
   | "DatabaseError"
   /** A stored token does not decrypt with TOKEN_ENCRYPTION_KEY. */
-  | "TokenDecryptFailed";
+  | "TokenDecryptFailed"
+  /** The contract refused a call (the simulation failed with one of its own errors). */
+  | "ContractRejected"
+  /** The wallet's account does not exist on the network yet: it has no XLM or AVAX for fees. */
+  | "AccountNotFunded"
+  /** A transaction the web sent is not one of the calls AgentHabit relays. */
+  | "TransactionNotAllowed"
+  /** `deployments/*.json` disagrees with what the network says, or its contract is gone. */
+  | "DeploymentDrift";
 
 /** Structured, non-secret context attached to an error for logs and tests. */
 export type AgentHabitErrorDetails = Readonly<Record<string, unknown>>;

@@ -37,6 +37,16 @@ export {
   type ForeignFailure,
 } from "./contract-errors.js";
 export {
+  type DeployedInstance,
+  type DeployedParams,
+  type DeploymentsFile,
+  DeploymentsFileSchema,
+  isMondayMidnightChile,
+  liveInstance,
+  mondayMidnightChileAtOrBefore,
+  parseDeployments,
+} from "./deployments.js";
+export {
   AgentHabitError,
   type AgentHabitErrorCode,
   type AgentHabitErrorDetails,

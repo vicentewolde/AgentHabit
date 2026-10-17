@@ -7,6 +7,9 @@ Cada tag se crea solo con permiso del usuario.
 ## [Sin publicar]
 
 ### Añadido
+- **Contratos vivos en Stellar (T6a, en curso):** el comando para desplegar la instancia de producción en testnet, la
+  conexión con el contrato y la API de la web (estado de la semana, comprometer y recuperar). Todavía no hay un
+  contrato desplegado: falta el OK del usuario.
 - **Strava y la API (T5):** la API vincula una wallet de Stellar o Avalanche con una cuenta de Strava mediante un
   mensaje firmado, conecta Strava pidiendo ver todas las carreras y guarda los tokens cifrados. Cuenta los km de la
   semana solo con carreras válidas y registra una posición solo después de leerla en la cadena. Los datos de Strava se

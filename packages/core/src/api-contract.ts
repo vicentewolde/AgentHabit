@@ -116,7 +116,12 @@ export const PositionViewSchema = z.object({
   state: PositionStateSchema,
   amount: DecimalStringSchema,
   goalM: z.number().int(),
-  commitTxHash: z.string(),
+  /**
+   * The hash the web reported for this commit, or `null` when the position exists on-chain but the
+   * web never reported it (so the oracle cannot find it). The web keeps a commit's hash until
+   * `POST /positions` succeeds and shows a warning while this is `null`.
+   */
+  commitTxHash: z.string().nullable(),
 });
 
 /** One week, as the session's own user sees it. Never another user's. */

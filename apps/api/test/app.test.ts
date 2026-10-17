@@ -6,13 +6,23 @@ import {
   normalizeStellarContract,
   verifyStellarLinkSignature,
 } from "@agenthabit/chain-stellar";
-import { AgentHabitError } from "@agenthabit/core";
+import {
+  AgentHabitError,
+  ConfigResponseSchema,
+  type InstanceInfo,
+  MeResponseSchema,
+  type PositionState,
+  PreparedTxResponseSchema,
+  SubmitTxResponseSchema,
+  WeeksResponseSchema,
+} from "@agenthabit/core";
 import {
   type Database,
   findMirroredPosition,
   findStravaConnection,
   findWalletLink,
   parseTokenKey,
+  registerPosition,
   upsertWalletLink,
 } from "@agenthabit/db";
 import { createTestDatabase } from "@agenthabit/db/testing";
@@ -22,14 +32,16 @@ import type { Hono } from "hono";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { type CommitReader, createApp, type StravaGateway } from "../src/app.js";
+import { type ChainBackend, createApp, type StravaGateway } from "../src/app.js";
 
 // Synthetic wallets, tokens and athletes only (CLAUDE.md, rule 5).
 const ACCESS = "synthetic-access-token-AAAA";
 const REFRESH = "synthetic-refresh-token-RRRR";
 const CONTRACT = StrKey.encodeContract(Buffer.alloc(32, 7));
-const EVM_CONTRACT = "0x5425890298aed601595a70AB815c96711a31Bc65";
 const TX = "ab".repeat(32);
+const PASSPHRASE = "Test SDF Network ; September 2015";
+// Monday 12 Oct 2026, 00:00 in UTC-3: week 0 starts here, so at the test clock (19 Oct) it is week 1.
+const ANCHOR = BigInt(Date.parse("2026-10-12T03:00:00Z") / 1000);
 const WEB = "http://localhost:5173";
 const REDIRECT = "http://localhost:5173/strava/callback";
 
@@ -41,7 +53,16 @@ let revoked: string[];
 let revokeFails: boolean;
 /** Every session token, signature and OAuth state the tests handled: none may reach a log. */
 let secrets: string[];
-let commits: Map<string, { amount: bigint; goalM: bigint }>;
+/** A simulated chain: the current week, the positions on it and what each call did. */
+const chain = {
+  week: 1n,
+  positions: new Map<string, { state: PositionState; amount: bigint; goalM: bigint }>(),
+  verified: new Map<string, { amount: bigint; goalM: bigint }>(),
+  calls: [] as string[],
+  reject: null as AgentHabitError | null,
+};
+/** What Strava would answer, and how often it was asked. */
+const strava_ = { totalM: 7_500n, reads: 0, refreshes: 0, fails: false };
 let exchange: (code: string, scope: string) => Promise<Connection>;
 let app: Hono;
 const tokenKey = parseTokenKey(randomBytes(32).toString("base64"));
@@ -54,11 +75,62 @@ const strava: StravaGateway = {
     if (revokeFails) throw new AgentHabitError("NetworkError", "down");
     revoked.push(accessToken);
   },
+  refresh: async () => {
+    strava_.refreshes++;
+    return {
+      accessToken: "synthetic-access-token-BBBB",
+      refreshToken: "synthetic-refresh-token-SSSS",
+      expiresAt: new Date(clock.getTime() + 6 * 3_600_000),
+    };
+  },
+  readWeek: async () => {
+    strava_.reads++;
+    if (strava_.fails) throw new AgentHabitError("StravaRateLimited", "limit");
+    return { totalM: strava_.totalM, countedIds: ["1", "2"] };
+  },
 };
 
-const commitReader: CommitReader = {
-  readCommit: async ({ chain, contract, user, weekId, txHash }) =>
-    commits.get(`${chain}:${contract}:${user}:${weekId}:${txHash}`) ?? null,
+const instance: InstanceInfo = {
+  chain: "stellar",
+  kind: "production",
+  contract: CONTRACT,
+  token: StrKey.encodeContract(Buffer.alloc(32, 1)),
+  tokenDecimals: 7,
+  networkPassphrase: PASSPHRASE,
+  explorerTxUrl: "https://stellar.expert/explorer/testnet/tx/{hash}",
+  minAmount: "200000000",
+  maxAmount: "500000000",
+  minGoalM: 10_000,
+  maxGoalM: 300_000,
+  weekLenS: 604_800,
+  graceS: 172_800,
+  staleAfterS: 604_800,
+};
+
+const backend: ChainBackend = {
+  instance,
+  weekParams: { weekAnchor: ANCHOR, weekLen: 604_800n, grace: 172_800n, staleAfter: 604_800n },
+  currentWeek: async () => chain.week,
+  getPosition: async (user, weekId) =>
+    chain.positions.get(`${user}:${weekId}`) ?? { state: "None", amount: 0n, goalM: 0n },
+  prepareCommit: async (call) => {
+    chain.calls.push(`commit:${call.user}:${call.weekId}:${call.amount}:${call.goalM}`);
+    if (chain.reject !== null) throw chain.reject;
+    return { xdr: "AAAA-unsigned-commit", networkPassphrase: PASSPHRASE };
+  },
+  prepareRelease: async (call) => {
+    chain.calls.push(`release:${call.user}:${call.weekId}`);
+    if (chain.reject !== null) throw chain.reject;
+    return { xdr: "AAAA-unsigned-release", networkPassphrase: PASSPHRASE };
+  },
+  submit: async (signedXdr, owner) => {
+    chain.calls.push(`submit:${owner}:${signedXdr}`);
+    if (chain.reject !== null) throw chain.reject;
+    return { txHash: TX, status: "SUCCESS" };
+  },
+  transactionStatus: async () => "PENDING",
+  verifyCommit: async ({ user, weekId, txHash }) =>
+    chain.verified.get(`${user}:${weekId}:${txHash}`) ?? null,
 };
 
 beforeEach(async () => {
@@ -68,7 +140,12 @@ beforeEach(async () => {
   revoked = [];
   revokeFails = false;
   secrets = [ACCESS, REFRESH, "code-1"];
-  commits = new Map();
+  chain.week = 1n;
+  chain.positions.clear();
+  chain.verified.clear();
+  chain.calls.length = 0;
+  chain.reject = null;
+  Object.assign(strava_, { totalM: 7_500n, reads: 0, refreshes: 0, fails: false });
   exchange = async (_code, scope) => ({
     accessToken: ACCESS,
     refreshToken: REFRESH,
@@ -92,8 +169,7 @@ beforeEach(async () => {
         verifyLinkSignature: verifyEvmLinkSignature,
       },
     },
-    commits: commitReader,
-    knownContracts: new Set([`stellar:${CONTRACT}`, `avalanche:${EVM_CONTRACT}`]),
+    backends: { stellar: backend },
     webOrigin: WEB,
     stravaRedirectUri: REDIRECT,
     now: () => clock,
@@ -393,7 +469,7 @@ describe("the position mirror", () => {
 
   it("stores a position only after reading it on-chain", async () => {
     const { wallet, session } = await linkedWallet();
-    commits.set(`stellar:${CONTRACT}:${wallet.address}:3:${TX}`, {
+    chain.verified.set(`${wallet.address}:3:${TX}`, {
       amount: 200_000_000n,
       goalM: 10_000n,
     });
@@ -436,7 +512,7 @@ describe("the position mirror", () => {
 
   it("freezes the athlete: relinking the wallet later does not move an existing position", async () => {
     const { wallet, session } = await linkedWallet();
-    commits.set(`stellar:${CONTRACT}:${wallet.address}:3:${TX}`, {
+    chain.verified.set(`${wallet.address}:3:${TX}`, {
       amount: 200_000_000n,
       goalM: 10_000n,
     });
@@ -458,22 +534,19 @@ describe("the position mirror", () => {
     expect(stored?.athleteId).toBe(777n);
   });
 
-  it("accepts an EVM contract address in any case, normalized to its checksum form", async () => {
+  it("refuses the Avalanche chain until it has a backend", async () => {
     const wallet = evmWallet();
     const session = await signIn(wallet);
-    await connectStrava(session);
-    commits.set(`avalanche:${EVM_CONTRACT}:${wallet.address}:3:${TX}`, {
-      amount: 20_000_000n,
-      goalM: 10_000n,
-    });
 
     const response = await app.request(
       "/positions",
-      json(report({ chain: "avalanche", contract: EVM_CONTRACT.toLowerCase() }), bearer(session)),
+      json(
+        report({ chain: "avalanche", contract: "0x5425890298aed601595a70AB815c96711a31Bc65" }),
+        bearer(session),
+      ),
     );
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ contract: EVM_CONTRACT });
+    expect(response.status).toBe(400);
   });
 
   it("refuses a body over the size limit", async () => {
@@ -505,5 +578,327 @@ describe("the position mirror", () => {
     expect(
       (await app.request("/positions", json(report({ txHash: "nope" }), bearer(session)))).status,
     ).toBe(400);
+  });
+});
+
+/** A wallet with a session and a live Strava connection: what the web has after connecting. */
+async function connectedWallet() {
+  const wallet = stellarWallet();
+  const session = await signIn(wallet);
+  expect((await connectStrava(session)).status).toBe(200);
+  return { wallet, session };
+}
+
+const get = (path: string, session?: string, headers: Record<string, string> = {}) =>
+  app.request(path, { headers: { ...(session === undefined ? {} : bearer(session)), ...headers } });
+
+describe("the public configuration and /me", () => {
+  it("lists the instances the web can use, without a session", async () => {
+    const response = await get("/config");
+
+    const config = ConfigResponseSchema.parse(await response.json());
+    expect(config.webOrigin).toBe(WEB);
+    expect(config.instances).toEqual([instance]);
+  });
+
+  it("says who the session is and whether Strava is connected", async () => {
+    const wallet = stellarWallet();
+    const session = await signIn(wallet);
+
+    const before = MeResponseSchema.parse(await (await get("/me", session)).json());
+    expect(before).toEqual({ chain: "stellar", address: wallet.address, stravaConnected: false });
+
+    await connectStrava(session);
+    const after = MeResponseSchema.parse(await (await get("/me", session)).json());
+    expect(after.stravaConnected).toBe(true);
+  });
+
+  it("needs a session for /me", async () => {
+    expect((await get("/me")).status).toBe(401);
+  });
+});
+
+describe("the week status", () => {
+  it("shows the current and the next week with their dates and no position", async () => {
+    const { session } = await connectedWallet();
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.currentWeek).toMatchObject({
+      weekId: "1",
+      startsAt: "2026-10-19T03:00:00.000Z",
+      endsAt: "2026-10-26T03:00:00.000Z",
+      position: null,
+      totalM: null,
+    });
+    // The partner's first week: it ends on 2 Nov and settles two days later (A-22).
+    expect(weeks.nextWeek).toMatchObject({
+      weekId: "2",
+      startsAt: "2026-10-26T03:00:00.000Z",
+      endsAt: "2026-11-02T03:00:00.000Z",
+      settleOpensAt: "2026-11-04T03:00:00.000Z",
+      releaseOpensAt: "2026-11-09T03:00:00.000Z",
+      position: null,
+    });
+  });
+
+  it("shows an active position with the km run so far, and the hash the web reported", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.positions.set(`${wallet.address}:1`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+    await registerPosition(
+      db,
+      {
+        chain: "stellar",
+        contract: CONTRACT,
+        user: wallet.address,
+        weekId: 1n,
+        athleteId: 777n,
+        amount: 200_000_000n,
+        goalM: 12_000n,
+        commitTxHash: TX,
+      },
+      clock,
+    );
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.currentWeek.position).toEqual({
+      state: "Active",
+      amount: "200000000",
+      goalM: 12_000,
+      commitTxHash: TX,
+    });
+    expect(weeks.currentWeek.totalM).toBe(7_500);
+    expect(weeks.currentWeek.readAt).toBe(clock.toISOString());
+    // The next week is never read from Strava: it has not started.
+    expect(strava_.reads).toBe(1);
+  });
+
+  it("reads Strava once per ten minutes, however often the page is opened", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.positions.set(`${wallet.address}:1`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+
+    await get("/weeks/me", session);
+    await get("/weeks/me", session);
+    expect(strava_.reads).toBe(1);
+
+    clock = new Date(clock.getTime() + 11 * 60_000);
+    await get("/weeks/me", session);
+    expect(strava_.reads).toBe(2);
+  });
+
+  it("warns that a position is unreported: the chain has it, the mirror does not", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.positions.set(`${wallet.address}:2`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.nextWeek.position).toMatchObject({ state: "Active", commitTxHash: null });
+  });
+
+  it("still answers when Strava fails, with no kilometres instead of an error", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.positions.set(`${wallet.address}:1`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+    strava_.fails = true;
+
+    const response = await get("/weeks/me", session);
+
+    expect(response.status).toBe(200);
+    const weeks = WeeksResponseSchema.parse(await response.json());
+    expect(weeks.currentWeek.totalM).toBeNull();
+    expect(weeks.currentWeek.position?.state).toBe("Active");
+  });
+
+  it("does not read Strava for a week that is already settled", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.positions.set(`${wallet.address}:1`, {
+      state: "Returned",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.currentWeek.position?.state).toBe("Returned");
+    expect(weeks.currentWeek.totalM).toBeNull();
+    expect(strava_.reads).toBe(0);
+  });
+
+  it("never shows another wallet's position or kilometres", async () => {
+    const owner = await connectedWallet();
+    chain.positions.set(`${owner.wallet.address}:1`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+    const other = await signIn(stellarWallet());
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", other)).json());
+
+    expect(weeks.currentWeek.position).toBeNull();
+    expect(weeks.currentWeek.totalM).toBeNull();
+  });
+
+  it("needs a session", async () => {
+    expect((await get("/weeks/me")).status).toBe(401);
+  });
+});
+
+describe("the transactions the wallet signs", () => {
+  it("builds next week's commit for the session's wallet", async () => {
+    const { wallet, session } = await connectedWallet();
+
+    const response = await app.request(
+      "/tx/commit",
+      json({ amount: "200000000", goalM: 15_000 }, bearer(session)),
+    );
+
+    expect(response.status).toBe(200);
+    expect(PreparedTxResponseSchema.parse(await response.json())).toEqual({
+      xdr: "AAAA-unsigned-commit",
+      networkPassphrase: PASSPHRASE,
+      weekId: "2",
+    });
+    expect(chain.calls).toEqual([`commit:${wallet.address}:2:200000000:15000`]);
+  });
+
+  it("refuses to build a commit before Strava is connected: the oracle could not count it", async () => {
+    const session = await signIn(stellarWallet());
+
+    const response = await app.request(
+      "/tx/commit",
+      json({ amount: "200000000", goalM: 15_000 }, bearer(session)),
+    );
+
+    expect(response.status).toBe(400);
+    expect(chain.calls).toEqual([]);
+  });
+
+  it("refuses a commit after the Strava connection was revoked", async () => {
+    const { session } = await connectedWallet();
+    await app.request("/strava/disconnect", { method: "POST", headers: bearer(session) });
+
+    const response = await app.request(
+      "/tx/commit",
+      json({ amount: "200000000", goalM: 15_000 }, bearer(session)),
+    );
+
+    expect(response.status).toBe(400);
+    expect(chain.calls).toEqual([]);
+  });
+
+  it("passes on what the contract would refuse, as a 422 that names the error only", async () => {
+    const { session } = await connectedWallet();
+    chain.reject = new AgentHabitError("ContractRejected", "refused", {
+      details: { contractError: "AmountOutOfRange" },
+    });
+
+    const response = await app.request(
+      "/tx/commit",
+      json({ amount: "1", goalM: 15_000 }, bearer(session)),
+    );
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: "ContractRejected" });
+  });
+
+  it("builds the release for the wallet's own position", async () => {
+    const { wallet, session } = await connectedWallet();
+
+    const response = await app.request("/tx/release", json({ weekId: "1" }, bearer(session)));
+
+    expect(response.status).toBe(200);
+    expect(PreparedTxResponseSchema.parse(await response.json()).weekId).toBe("1");
+    expect(chain.calls).toEqual([`release:${wallet.address}:1`]);
+  });
+
+  it("relays a signed transaction on behalf of the session's wallet only", async () => {
+    const { wallet, session } = await connectedWallet();
+
+    const response = await app.request("/tx/submit", json({ xdr: "AAAA-signed" }, bearer(session)));
+
+    expect(SubmitTxResponseSchema.parse(await response.json())).toEqual({
+      txHash: TX,
+      status: "SUCCESS",
+    });
+    expect(chain.calls).toEqual([`submit:${wallet.address}:AAAA-signed`]);
+  });
+
+  it("answers 400 when the transaction is not one the web is meant to send", async () => {
+    const { session } = await connectedWallet();
+    chain.reject = new AgentHabitError("TransactionNotAllowed", "not relayed");
+
+    const response = await app.request("/tx/submit", json({ xdr: "AAAA-signed" }, bearer(session)));
+
+    expect(response.status).toBe(400);
+  });
+
+  it("tells the outcome of a transaction that was still pending", async () => {
+    const { session } = await connectedWallet();
+
+    const response = await get(`/tx/${TX}`, session);
+
+    expect(await response.json()).toEqual({ txHash: TX, status: "PENDING" });
+    expect((await get("/tx/not-a-hash", session)).status).toBe(400);
+  });
+
+  it("needs a session for every one of them", async () => {
+    for (const [path, value] of [
+      ["/tx/commit", { amount: "1", goalM: 1 }],
+      ["/tx/release", { weekId: "1" }],
+      ["/tx/submit", { xdr: "AAAA" }],
+    ] as const) {
+      expect((await app.request(path, json(value))).status, path).toBe(401);
+    }
+    expect((await get(`/tx/${TX}`)).status).toBe(401);
+    expect(chain.calls).toEqual([]);
+  });
+});
+
+describe("CORS", () => {
+  it("lets the web's origin call with the session header, and answers its preflight", async () => {
+    const preflight = await app.request("/weeks/me", {
+      method: "OPTIONS",
+      headers: {
+        origin: WEB,
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "authorization",
+      },
+    });
+
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe(WEB);
+    expect(preflight.headers.get("access-control-allow-headers")?.toLowerCase()).toContain(
+      "authorization",
+    );
+  });
+
+  it("answers an error with the CORS header too, so the web can read the code", async () => {
+    const response = await get("/me", undefined, { origin: WEB });
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("access-control-allow-origin")).toBe(WEB);
+  });
+
+  it("does not echo another origin", async () => {
+    const response = await get("/config", undefined, { origin: "https://evil.example" });
+
+    expect(response.headers.get("access-control-allow-origin")).not.toBe("https://evil.example");
   });
 });

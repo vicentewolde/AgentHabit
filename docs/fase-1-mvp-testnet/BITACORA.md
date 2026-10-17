@@ -182,3 +182,34 @@ Neon sí quedó listo: el proyecto `agenthabit` existe en AWS São Paulo y el us
 Falta aplicar las migraciones con `pnpm run db:migrate`, ya con el código en `main`.
 
 **Evidencia.** [`evidencia/T5.md`](evidencia/T5.md).
+
+---
+
+## T6a · Contratos vivos en Stellar (en curso)
+
+Primera parte de T6 bajo el plan acelerado (`A-22`): lo que el socio del usuario necesita para comprometer antes del
+domingo 25.
+
+**Qué quedó funcionando.** El código está listo y probado con una red simulada. Falta desplegarlo, y eso necesita el
+OK del usuario.
+- **El despliegue de la instancia de producción de Stellar.** Un comando que primero muestra el plan y solo envía si
+  se le dice. Si se repite no hace nada, y si algo no coincide se detiene en lugar de adivinar. Deja el contrato
+  registrado en `deployments/stellar-testnet.json`.
+- **La conexión con el contrato.** Ya se pueden leer la configuración, la semana actual y las posiciones, y armar
+  las dos transacciones que firma la wallet: comprometer y recuperar.
+- **La API de la web.** Entrega:
+  - la configuración;
+  - quién es el usuario;
+  - la semana actual y la siguiente, con los kilómetros leídos de Strava, con una caché de 10 minutos para no gastar
+    el límite;
+  - la preparación y el envío de las transacciones.
+
+  No deja comprometer sin Strava conectado, y solo reenvía las dos llamadas permitidas (`A-23`).
+- **El contrato entre la web y la API**, escrito una vez con esquemas compartidos.
+
+**Lo que falta de T6a.** Desplegar (con OK, y con el código ya en `main` para que el comando lea tu `.env.local`),
+comprometer una vez desde el usuario de prueba para ver el contrato funcionando en la red y guardar las salidas.
+
+**Decisiones nuevas.** `A-22` (el plan), `A-23` (la API arma y reenvía) y `A-24` (cómo despliega el comando).
+
+**Evidencia.** [`evidencia/T6a.md`](evidencia/T6a.md).

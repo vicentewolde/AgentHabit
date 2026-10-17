@@ -1,6 +1,6 @@
 // `pnpm run api:dev`: the API on API_PORT, with the settings from `.env.local` (never argv).
 import { randomBytes } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { normalizeEvmAddress, verifyEvmLinkSignature } from "@agenthabit/chain-avalanche";
@@ -9,24 +9,42 @@ import {
   normalizeStellarContract,
   verifyStellarLinkSignature,
 } from "@agenthabit/chain-stellar";
-import { parseApiEnv } from "@agenthabit/config";
-import { AgentHabitError } from "@agenthabit/core";
+import { parseApiEnv, parseEnv } from "@agenthabit/config";
+import { AgentHabitError, type ChainId, liveInstance, parseDeployments } from "@agenthabit/core";
 import { createDatabase, parseTokenKey } from "@agenthabit/db";
 import { StravaClient } from "@agenthabit/strava";
 import { serve } from "@hono/node-server";
+import { rpc } from "@stellar/stellar-sdk";
 
-import { type CommitReader, createApp } from "./app.js";
+import { type ChainBackend, createApp } from "./app.js";
+import { createStellarBackend } from "./stellar-backend.js";
 
-const envPath = resolve(import.meta.dirname, "../../../.env.local");
+const root = resolve(import.meta.dirname, "../../..");
+const envPath = resolve(root, ".env.local");
 if (existsSync(envPath)) process.loadEnvFile(envPath);
 const env = parseApiEnv(process.env);
+const chainEnv = parseEnv(process.env);
 
-/** On-chain reads land with T6's adapters; until then every reported commit is refused. */
-const commitsUntilT6: CommitReader = {
-  readCommit: async () => {
-    throw new AgentHabitError("NetworkError", "On-chain commit reads land with T6");
-  },
-};
+/** The production instance each deployments file records, if there is one. */
+const backends: Partial<Record<ChainId, ChainBackend>> = {};
+const stellarFile = resolve(root, "deployments/stellar-testnet.json");
+if (existsSync(stellarFile)) {
+  const file = parseDeployments(JSON.parse(readFileSync(stellarFile, "utf8")));
+  const instance = liveInstance(file, "production");
+  if (instance !== null) {
+    backends.stellar = createStellarBackend({
+      file,
+      instance,
+      server: new rpc.Server(chainEnv.STELLAR_RPC_URL),
+    });
+  }
+}
+if (Object.keys(backends).length === 0) {
+  throw new AgentHabitError(
+    "ConfigError",
+    "No deployed instance: run `pnpm run deploy:stellar -- --yes` first",
+  );
+}
 
 const { db } = createDatabase(env.DATABASE_URL);
 const app = createApp({
@@ -50,9 +68,7 @@ const app = createApp({
       verifyLinkSignature: verifyEvmLinkSignature,
     },
   },
-  commits: commitsUntilT6,
-  // Filled from deployments/*.json once T6 deploys the contracts.
-  knownContracts: new Set(),
+  backends,
   webOrigin: env.WEB_ORIGIN,
   stravaRedirectUri: env.STRAVA_REDIRECT_URI,
   now: () => new Date(),

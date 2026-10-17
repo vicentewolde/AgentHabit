@@ -221,6 +221,13 @@ funds):
 pnpm run db:migrate
 ```
 
+Plan the deployment of the production instance to Stellar testnet (sends nothing; add `--yes` to
+send, with the user's OK):
+
+```bash
+pnpm run deploy:stellar
+```
+
 Run the API on `API_PORT` (default 3000), reading `.env.local`:
 
 ```bash

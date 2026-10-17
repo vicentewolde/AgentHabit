@@ -21,11 +21,11 @@
     "@agenthabit/db": "workspace:*",
     "@agenthabit/strava": "workspace:*",
     "@hono/node-server": "2.1.5",
+    "@stellar/stellar-sdk": "17.2.1",
     "hono": "4.13.13",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@stellar/stellar-sdk": "17.2.1",
     "viem": "2.57.7"
   }
 }

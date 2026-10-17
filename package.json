@@ -22,9 +22,11 @@
     "db:generate": "pnpm --filter @agenthabit/db run db:generate",
     "db:migrate": "tsx --conditions=@agenthabit/source packages/db/src/migrate.ts",
     "api:dev": "tsx --conditions=@agenthabit/source apps/api/src/server.ts",
-    "bootstrap": "tsx --conditions=@agenthabit/source scripts/bootstrap.ts"
+    "bootstrap": "tsx --conditions=@agenthabit/source scripts/bootstrap.ts",
+    "deploy:stellar": "tsx --conditions=@agenthabit/source scripts/deploy-stellar.ts"
   },
   "devDependencies": {
+    "@agenthabit/chain-stellar": "workspace:*",
     "@agenthabit/config": "workspace:*",
     "@agenthabit/core": "workspace:*",
     "@biomejs/biome": "2.5.15",

@@ -7,7 +7,7 @@ logs.
 |---|---|---|
 | `bootstrap.ts` | `pnpm run bootstrap` | T2 ✓ |
 | `gen-cases.ts` | `pnpm run cases:gen` | T4 ✓ |
-| `deploy-stellar.ts` | `pnpm run deploy:stellar` | T6 |
+| `deploy-stellar.ts` | `pnpm run deploy:stellar` (plan only; `--yes` sends, `--reset` after a testnet reset) | T6a ✓ |
 | `deploy-avalanche.ts` | `pnpm run deploy:avalanche` | T6 |
 | `lib/` | `env-file`, `network`, `keys`, `stellar-testnet` and the bootstrap logic, with tests; `cases-path` | T2 ✓, T4 ✓ |
 

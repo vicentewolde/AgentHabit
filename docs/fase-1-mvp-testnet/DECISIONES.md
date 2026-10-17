@@ -14,6 +14,7 @@ Estados: `Vigente` · `Superada` · `Pendiente`
 - **`A-12` a `A-14`:** las tomó Claude Code en T4, donde el spec dejaba la cifra o el detalle a esa tarea. Se
   revisan con `/revisar` antes del merge.
 - **`A-22`:** la decidió el usuario el 17-oct, al fijar la fecha del 26-oct para su socio.
+- **`A-23` y `A-24`:** las tomó Claude Code en T6a, bajo ese plan.
 - **`A-15` a `A-21`:** las tomó Claude Code en T5 (`A-19` a `A-21` tras `/revisar`), con lo verificado por `integraciones` en
   `docs/integraciones/strava.md` y `firmas.md`. El usuario pidió seguir sin pedirle aprobación; se revisan con
   `/revisar` antes del merge.
@@ -467,3 +468,53 @@ después, y `release_if_stale` devuelve todo si algo falla.
 **Alternativa descartada:** mainnet para el 26. Hoy el proyecto lo prohíbe antes de la Fase 2, el contrato no tiene
 una revisión externa y no tiene admin ni retiro: un error bloquearía dinero real para siempre. Tampoco se hizo la
 Fase 1 completa antes de invitar a nadie, porque no cabe en 9 días.
+
+---
+
+### A-23 · La API arma las transacciones y solo reenvía las dos llamadas de la web · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T6a
+
+La API arma el `commit` y el `release_if_stale` sin firmar para la wallet de la sesión, simulados contra la red. La
+wallet los firma en el navegador, y la API los reenvía con `POST /tx/submit`. El navegador nunca habla con la RPC.
+
+**La regla del reenvío.** La API envía una transacción solo si cumple todo esto:
+- tiene una única operación, que es una llamada a un contrato;
+- el contrato es el desplegado en `deployments/*.json`;
+- la función es `commit` o `release_if_stale`;
+- la cuenta de origen es la wallet de la sesión;
+- el primer argumento de la llamada es esa misma wallet.
+
+Cualquier otra cosa se rechaza con `TransactionNotAllowed` y no se envía nada.
+
+**Un `commit` exige Strava conectado antes de armarse.** Si no, el usuario bloquearía su dinero en una posición que
+el oráculo no podría asociar a ningún atleta.
+
+**Motivo.** La web no necesita ni debe conocer la RPC, y armar la transacción en el servidor permite fallar antes de
+pedir la firma, con el error del contrato en lenguaje que la web entiende. La regla evita que la API sea un relé
+gratuito para transacciones ajenas.
+
+**Alternativa descartada:** que la web arme y envíe con el SDK de Stellar. Suma el SDK al navegador, deja la URL de
+la RPC y su límite en manos de cada visitante, y no permite verificar qué se firma.
+
+---
+
+### A-24 · El despliegue ensaya primero, conserva el ancla y se detiene ante cualquier desvío · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T6a
+
+`pnpm run deploy:stellar` despliega la instancia de producción de Stellar:
+- **Sin `--yes` solo imprime el plan** y no envía nada. Con `--yes` envía.
+- **El ancla** es el último lunes a las 00:00 (UTC-3) que ya pasó, porque antes del ancla `commit` falla con
+  `BeforeAnchor`. Una instancia ya registrada conserva su ancla: los números de semana no cambian a mitad de un reto.
+- **Es repetible.** Si el contrato registrado existe y coincide, no hace nada.
+- **Se detiene con `DeploymentDrift`** si:
+  - el contrato de la red no coincide con el archivo;
+  - el wasm local no es el desplegado;
+  - el contrato registrado ya no existe. Para ese caso hace falta `--reset`, tras comprobar que fue un reinicio.
+- **Lee el contrato de vuelta antes de registrarlo.** Si el contrato nuevo no contiene lo desplegado, no lo registra.
+- **Imprime solo datos públicos,** y una línea que llevara una clave detiene la corrida.
+
+**Motivo.** Un despliegue mueve fondos de testnet y no se deshace (`CLAUDE.md`, regla 8): conviene ver el plan antes
+de enviarlo. Conservar el ancla evita que repetir el script cambie qué semana es cuál.
+
+**Alternativa descartada:** pedir confirmación por teclado. Los permisos del proyecto ya piden el OK del usuario para
+cada `pnpm run deploy:*`, y un `--yes` explícito deja el comando exacto en la historia de la sesión.
