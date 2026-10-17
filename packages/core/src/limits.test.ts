@@ -59,6 +59,10 @@ describe("validateParams", () => {
       { grace: 0n },
       { grace: good.staleAfter },
       { grace: good.staleAfter + 1n },
+      { weekAnchor: -1n },
+      { staleAfter: 2n ** 64n },
+      { maxGoalM: 2n ** 64n },
+      { maxAmount: 2n ** 127n },
     ];
     for (const change of cases) {
       expect(hasErrorCode(broken(change), "InvalidConfig")).toBe(true);
@@ -67,25 +71,23 @@ describe("validateParams", () => {
 });
 
 describe("goalMet", () => {
-  it("counts the goal as met from exactly the goal distance", () => {
-    expect(goalMet(9_999.9, 10_000n)).toBe(false);
-    expect(goalMet(10_000, 10_000n)).toBe(true);
-    expect(goalMet(12_345.6, 10_000n)).toBe(true);
+  it("counts the goal as met from exactly the goal, in whole metres", () => {
+    expect(goalMet(9_999n, 10_000n)).toBe(false);
+    expect(goalMet(10_000n, 10_000n)).toBe(true);
+    expect(goalMet(12_345n, 10_000n)).toBe(true);
   });
 
   it("treats no runs as not met", () => {
-    expect(goalMet(0, 500n)).toBe(false);
+    expect(goalMet(0n, 500n)).toBe(false);
   });
 
-  it("rejects a distance that is not a finite, non-negative number", () => {
-    for (const distance of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
-      let error: unknown;
-      try {
-        goalMet(distance, 10_000n);
-      } catch (caught) {
-        error = caught;
-      }
-      expect(hasErrorCode(error, "InvalidDistance")).toBe(true);
+  it("rejects a negative total", () => {
+    let error: unknown;
+    try {
+      goalMet(-1n, 10_000n);
+    } catch (caught) {
+      error = caught;
     }
+    expect(hasErrorCode(error, "InvalidDistance")).toBe(true);
   });
 });

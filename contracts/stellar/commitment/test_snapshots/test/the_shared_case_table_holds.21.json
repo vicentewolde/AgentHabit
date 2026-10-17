@@ -73,6 +73,7 @@
     [],
     [],
     [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
@@ -131,6 +132,8 @@
     [],
     [],
     [],
+    [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
@@ -147,7 +150,7 @@
                   "u64": "1"
                 },
                 {
-                  "bool": false
+                  "bool": true
                 }
               ]
             }
@@ -384,7 +387,7 @@
                       "symbol": "state"
                     },
                     "val": {
-                      "u32": 3
+                      "u32": 2
                     }
                   }
                 ]
@@ -512,7 +515,7 @@
                         ]
                       },
                       "val": {
-                        "i128": "200000000"
+                        "i128": "0"
                       }
                     }
                   ]
@@ -549,7 +552,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "9800000000"
+                      "i128": "10000000000"
                     }
                   },
                   {
@@ -653,7 +656,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "200000000"
+                      "i128": "0"
                     }
                   },
                   {

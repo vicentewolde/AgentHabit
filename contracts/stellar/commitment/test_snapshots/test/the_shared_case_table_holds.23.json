@@ -1,7 +1,7 @@
 {
   "generators": {
     "address": 6,
-    "nonce": 2,
+    "nonce": 4,
     "mux_id": 0
   },
   "auth": [
@@ -73,6 +73,7 @@
     [],
     [],
     [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
@@ -131,6 +132,30 @@
     [],
     [],
     [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
@@ -147,7 +172,7 @@
                   "u64": "1"
                 },
                 {
-                  "bool": false
+                  "bool": true
                 }
               ]
             }
@@ -166,7 +191,7 @@
   "ledger": {
     "protocol_version": 29,
     "sequence_number": 0,
-    "timestamp": 2814399,
+    "timestamp": 2382400,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -329,7 +354,7 @@
               "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
               "key": {
                 "ledger_key_nonce": {
-                  "nonce": "2"
+                  "nonce": "4"
                 }
               },
               "durability": "temporary",
@@ -384,7 +409,7 @@
                       "symbol": "state"
                     },
                     "val": {
-                      "u32": 3
+                      "u32": 2
                     }
                   }
                 ]
@@ -512,7 +537,7 @@
                         ]
                       },
                       "val": {
-                        "i128": "200000000"
+                        "i128": "0"
                       }
                     }
                   ]
@@ -549,7 +574,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "9800000000"
+                      "i128": "10000000000"
                     }
                   },
                   {
@@ -653,7 +678,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "200000000"
+                      "i128": "0"
                     }
                   },
                   {

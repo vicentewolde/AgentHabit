@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.37;
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {Commitment} from "../src/Commitment.sol";
@@ -11,6 +12,7 @@ import {MockUSDC} from "./mocks/MockUSDC.sol";
 contract CasesTest is Test {
     uint256 private constant DECIMALS = 1e6;
     uint256 private constant STARTING_BALANCE = 1_000 * DECIMALS;
+    string private constant BLACKLISTED = "Blacklistable: account is blacklisted";
 
     // Fields in the JSON keys' alphabetical order: `vm.parseJson` decodes by position, so a
     // field may be renamed (`err` for the reserved-to-be `error`) but never reordered.
@@ -55,6 +57,7 @@ contract CasesTest is Test {
 
     struct Before {
         uint256 ownerBalance;
+        uint256 contractBalance;
         uint256 forfeited;
     }
 
@@ -160,7 +163,8 @@ contract CasesTest is Test {
         uint64 weekId = uint64(vm.parseUint(step.week_id));
         vm.warp(vm.parseUint(step.time));
 
-        Before memory before = Before(token.balanceOf(owner), commitment.totalForfeited());
+        Before memory before =
+            Before(token.balanceOf(owner), token.balanceOf(address(commitment)), commitment.totalForfeited());
         (string memory failure, string memory result) = _execute(label, step, owner, weekId);
 
         assertEq(failure, step.err, string.concat(label, ": error"));
@@ -231,6 +235,16 @@ contract CasesTest is Test {
 
         uint256 expectedForfeited = _eq(step.forfeited, "increased") ? position.amount : 0;
         assertEq(commitment.totalForfeited() - before.forfeited, expectedForfeited, string.concat(label, ": forfeited"));
+
+        // A successful commit stores exactly what was asked, and the contract receives exactly it.
+        if (_eq(step.action, "commit") && _eq(step.err, "")) {
+            uint256 asked = _amount(step.amount);
+            assertEq(position.amount, asked, string.concat(label, ": stored amount"));
+            assertEq(uint256(position.goalM), vm.parseUint(step.goal_m), string.concat(label, ": stored goal"));
+            assertEq(
+                token.balanceOf(address(commitment)), before.contractBalance + asked, string.concat(label, ": received")
+            );
+        }
     }
 
     /// balance(contract) = Σ Active amounts + total_forfeited, after every step.
@@ -260,10 +274,16 @@ contract CasesTest is Test {
         touchedWeeks.push(weekId);
     }
 
-    /// Contract errors by name; any other revert came from the token through SafeERC20.
+    /// Contract errors by name. `TokenFailure` is only the token's own refusal (MockUSDC's
+    /// blacklist message, or SafeERC20's failed-operation error): a panic, an empty revert or
+    /// anything else is `Unexpected` and fails the case instead of passing as a token failure.
     function _classify(bytes memory reason) private pure returns (string memory) {
-        if (reason.length < 4) return "TokenFailure";
+        if (keccak256(reason) == keccak256(abi.encodeWithSignature("Error(string)", BLACKLISTED))) {
+            return "TokenFailure";
+        }
+        if (reason.length < 4) return string.concat("Unexpected(", vm.toString(reason), ")");
         bytes4 selector = bytes4(reason);
+        if (selector == SafeERC20.SafeERC20FailedOperation.selector) return "TokenFailure";
         string[12] memory names = [
             "BeforeAnchor",
             "InvalidConfig",
@@ -281,7 +301,7 @@ contract CasesTest is Test {
         for (uint256 i = 0; i < names.length; i++) {
             if (selector == _selectorOf(names[i])) return names[i];
         }
-        return "TokenFailure";
+        return string.concat("Unexpected(", vm.toString(reason), ")");
     }
 
     function _selectorOf(string memory name) private pure returns (bytes4) {

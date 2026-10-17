@@ -44,8 +44,8 @@ y se comportan igual. Los dos hacen exactamente tres cosas con fondos:
 
 No hay ninguna otra forma de sacar dinero, y nadie (ni el equipo) puede cambiar las reglas.
 
-Para que las dos cadenas no se separen, hay una sola lista de situaciones escrita una vez en el núcleo común: **44
-casos con 126 pasos**. Cubren los bordes de las semanas, cada error, el orden en que se revisan los errores, el
+Para que las dos cadenas no se separen, hay una sola lista de situaciones escrita una vez en el núcleo común: **45
+casos con 127 pasos**. Cubren los bordes de las semanas, cada error, el orden en que se revisan los errores, el
 token que rechaza una devolución y varias semanas seguidas. Los dos contratos leen esa misma lista y la pasan entera.
 Si alguien cambia un contrato y rompe una regla, la lista lo detecta. Se probó metiendo un error a propósito: las dos
 cadenas fallaron en el mismo caso.
@@ -64,5 +64,25 @@ Todo corre en tests locales: no se desplegó nada ni se tocó la red con fondos.
   sin ancla, y `instanceParams` la recibe y valida todo con las reglas del constructor.
 
 **Decisiones nuevas.** `A-12`, `A-13` y `A-14`.
+
+**Revisión (`/revisar`).** El subagente `revisor` y la revisión propia de los dos contratos no encontraron
+bloqueantes: ningún camino saca fondos hacia alguien que no sea el dueño. Hubo 3 importantes, corregidos en un commit
+`fix` sobre la misma rama:
+- **La lista no revisaba lo guardado.** Un contrato que guardara mal el monto o la meta podía pasarla. Ahora, después
+  de cada compromiso, los tres ejecutores comparan lo guardado con lo pedido. Se probó metiendo esos errores a
+  propósito: los dos se detectan.
+- **Los ejecutores agrupaban fallos distintos en una misma categoría.**
+  - EVM contaba cualquier revert desconocido como "el token rechazó".
+  - Soroban contaba cualquier aborto como "falta firma", y en el constructor cualquier panic como "configuración
+    inválida".
+
+  Ahora un fallo inesperado hace fallar el caso. Una salvedad: en Soroban, una firma faltante y un panic llegan con el
+  mismo error del host. Por eso cuenta como "falta firma" solo si el paso de verdad omitió al firmante.
+- **`goalMet` sumaba distancias con decimales.** El spec (4.5) trunca cada carrera a metros enteros antes de sumar.
+  Ahora recibe el total en metros enteros (`bigint`).
+
+También entraron sugerencias baratas: un caso de compromiso en el primer segundo de la semana 0, rangos `u64` e
+`i128` en `validateParams`, y la excepción de `BalanceMismatch` escrita en `A-14`. Tres sugerencias son de T6 y
+quedaron como deuda en `docs/ESTADO.md`.
 
 **Evidencia.** [`evidencia/T4.md`](evidencia/T4.md).

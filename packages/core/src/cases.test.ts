@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import {
   type AmountRef,
   buildCaseFixture,
@@ -19,13 +19,19 @@ const knownFailures = new Set<string>([
   ...FOREIGN_FAILURES,
 ]);
 
+/** A commit step's amount reference; any other step has none, and asking for it is a table bug. */
+function amountRefOf(step: CaseStep): AmountRef {
+  if (step.amount === "") assert.fail(`${step.action} step has no amount`);
+  return step.amount;
+}
+
 /**
  * A reference model of spec 4.2 built only from the core arithmetic. It runs the table the way
  * the Rust and Foundry runners do, so a wrong expectation fails here before it reaches a chain.
  */
 class ReferenceContract {
   readonly params: ContractParams;
-  readonly positions = new Map<string, { state: PositionState; amount: bigint }>();
+  readonly positions = new Map<string, { state: PositionState; amount: bigint; goalM: bigint }>();
   readonly balances = new Map<string, bigint>([
     ["user", usdcToUnits(1_000n, "stellar")],
     ["stranger", usdcToUnits(1_000n, "stellar")],
@@ -62,7 +68,9 @@ class ReferenceContract {
   }
 
   position(owner: Owner, weekId: bigint) {
-    return this.positions.get(`${owner}:${weekId}`) ?? { state: "None" as const, amount: 0n };
+    return (
+      this.positions.get(`${owner}:${weekId}`) ?? { state: "None" as const, amount: 0n, goalM: 0n }
+    );
   }
 
   balance(account: string): bigint {
@@ -97,7 +105,7 @@ class ReferenceContract {
         if (step.actor !== owner) return fail("Unauthorized");
         if (this.position(owner, weekId).state !== "None") return fail("AlreadyCommitted");
         if (weekId !== currentWeek(now, this.params) + 1n) return fail("WrongWeek");
-        const amount = this.amountOf(step.amount as AmountRef);
+        const amount = this.amountOf(amountRefOf(step));
         if (amount < this.params.minAmount || amount > this.params.maxAmount) {
           return fail("AmountOutOfRange");
         }
@@ -107,7 +115,7 @@ class ReferenceContract {
         }
         if (this.blocked.has(owner)) return fail("TokenFailure");
         this.move(owner, "contract", amount);
-        this.positions.set(key, { state: "Active", amount });
+        this.positions.set(key, { state: "Active", amount, goalM: goal });
         return fail("");
       }
       case "settle": {
@@ -161,6 +169,12 @@ describe("the shared case table", () => {
         expect(failure, label).toBe(step.error);
         expect(result, label).toBe(step.result);
         expect(position.state, label).toBe(step.state);
+        if (step.action === "commit" && step.error === "") {
+          expect(position.amount, `${label}: stored amount`).toBe(
+            model.amountOf(amountRefOf(step)),
+          );
+          expect(position.goalM, `${label}: stored goal`).toBe(BigInt(step.goal_m));
+        }
 
         const ownerDelta = model.balance(step.owner) - ownerBefore;
         const expectedOwnerDelta = {

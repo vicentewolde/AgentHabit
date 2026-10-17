@@ -72,7 +72,9 @@ export interface ConstructorCase {
 
 /**
  * The validation order of each function, the same on both chains, so two simultaneous faults
- * give the same error (spec 4.2). The table proves every adjacent pair.
+ * give the same error (spec 4.2, A-14). The table proves every adjacent pair but one:
+ * `TokenFailure → BalanceMismatch` needs a token that charges a fee, which the SAC never does, so
+ * only the EVM suite proves it (`test_CommitRefusesATokenThatChargesAFee`).
  */
 export const VALIDATION_ORDER = {
   commit: [
@@ -264,6 +266,10 @@ const CASES: readonly ContractCase[] = [
   {
     name: "commit_locks_the_deposit_for_next_week",
     steps: [committed],
+  },
+  {
+    name: "commit_accepts_the_first_second_of_week_zero",
+    steps: [commit({ time: ANCHOR, week: 1n })],
   },
   {
     name: "commit_accepts_the_last_second_of_the_current_week",

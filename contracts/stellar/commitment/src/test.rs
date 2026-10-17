@@ -11,7 +11,8 @@ use soroban_sdk::{
         Address as _, Events as _, IssuerFlags, Ledger as _, MockAuth, MockAuthInvoke,
     },
     token::{StellarAssetClient, TokenClient},
-    Address, Env, Event as _, IntoVal, InvokeError,
+    xdr::ScErrorType,
+    Address, Env, Event as _, IntoVal, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::{
@@ -119,17 +120,44 @@ fn state_name(state: State) -> String {
     format!("{state:?}")
 }
 
-/// The contract's own errors by name (101 to 111). Anything else is foreign (spec 4.3): an
-/// error number from another contract, which here can only be the SAC, is `TokenFailure`; a
-/// host abort with no number, which is how a missing `require_auth` signature ends, is
-/// `Unauthorized`.
-fn classify<T, C>(result: Result<Result<T, C>, Result<Error, InvokeError>>) -> Option<String> {
-    match result {
-        Ok(_) => None,
-        Err(Ok(error)) => Some(error_name(error)),
-        Err(Err(InvokeError::Contract(_))) => Some("TokenFailure".to_string()),
-        Err(Err(InvokeError::Abort)) => Some("Unauthorized".to_string()),
+/// The Stellar Asset Contract numbers its own errors 1 to 13 (`ContractError` in
+/// soroban-env-host); ours start at 101 (A-12).
+const SAC_ERROR_CODES: core::ops::RangeInclusive<u32> = 1..=13;
+
+/// Names a failure by its host error (spec 4.3). Our contract errors by name; another
+/// contract's error in the SAC's range is `TokenFailure`.
+///
+/// A missing `require_auth` signature reaches the caller as `Error(Context, InvalidAction)`,
+/// the same error a Rust panic produces, so the type alone cannot tell them apart. It counts as
+/// `Unauthorized` only when the step really left the required signer out; with the signer
+/// present it is `Unexpected` and fails the case. A panic that fired regardless of the signer
+/// would also break every case where the signer did sign.
+fn classify(error: soroban_sdk::Error, signer_missing: bool) -> String {
+    if error.is_type(ScErrorType::Contract) {
+        let code = error.get_code();
+        if let Some(own) = ALL_ERRORS.iter().find(|own| **own as u32 == code) {
+            return error_name(*own);
+        }
+        if SAC_ERROR_CODES.contains(&code) {
+            return "TokenFailure".to_string();
+        }
+    } else if signer_missing
+        && (error.is_type(ScErrorType::Auth) || error.is_type(ScErrorType::Context))
+    {
+        return "Unauthorized".to_string();
     }
+    format!("Unexpected({error:?})")
+}
+
+/// The text of a caught panic, to check which error a failed constructor raised.
+fn panic_message(payload: &(dyn core::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    payload
+        .downcast_ref::<&str>()
+        .map(|message| message.to_string())
+        .unwrap_or_default()
 }
 
 struct World<'a> {
@@ -216,6 +244,26 @@ impl World<'_> {
         }
     }
 
+    /// Calls the contract and returns its value, or the failure named by [`classify`]. Goes
+    /// through `try_invoke_contract` so the host error keeps its type (`Auth`, `Contract`, ...).
+    fn invoke<T: TryFromVal<Env, Val>>(
+        &self,
+        func: &str,
+        args: Vec<Val>,
+        signer_missing: bool,
+    ) -> Result<T, String> {
+        match self.env.try_invoke_contract::<T, soroban_sdk::Error>(
+            &self.contract.address,
+            &Symbol::new(&self.env, func),
+            args,
+        ) {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(_)) => Err("Unexpected(return value)".to_string()),
+            Err(Ok(error)) => Err(classify(error, signer_missing)),
+            Err(Err(invoke)) => Err(format!("Unexpected({invoke:?})")),
+        }
+    }
+
     /// Only `actor` signs: a call that needs someone else's signature fails like on the network.
     fn sign_as(&self, actor: &Address, invoke: &MockAuthInvoke) {
         self.env.mock_auths(&[MockAuth {
@@ -230,6 +278,7 @@ impl World<'_> {
         let week_id: u64 = num(&step.week_id);
         self.env.ledger().set_timestamp(num(&step.time));
         let owner_before = self.token.balance(&owner);
+        let contract_before = self.token.balance(&self.contract.address);
         let forfeited_before = self.contract.total_forfeited();
 
         let contract_id = self.contract.address.clone();
@@ -255,7 +304,8 @@ impl World<'_> {
                         sub_invokes: &transfer,
                     },
                 );
-                classify(self.contract.try_commit(&owner, &week_id, &amount, &goal))
+                let args = (owner.clone(), week_id, amount, goal).into_val(&self.env);
+                self.invoke::<()>("commit", args, actor != owner).err()
             }
             "settle" => {
                 self.touched.push((owner.clone(), week_id));
@@ -269,21 +319,26 @@ impl World<'_> {
                         sub_invokes: &[],
                     },
                 );
-                classify(self.contract.try_settle(&owner, &week_id, &met))
+                let args = (owner.clone(), week_id, met).into_val(&self.env);
+                self.invoke::<()>("settle", args, actor != self.oracle)
+                    .err()
             }
             "release_if_stale" => {
                 self.touched.push((owner.clone(), week_id));
                 // Needs nobody's signature: whoever calls it, the money goes to the owner.
                 self.env.mock_auths(&[]);
-                classify(self.contract.try_release_if_stale(&owner, &week_id))
+                let args = (owner.clone(), week_id).into_val(&self.env);
+                self.invoke::<()>("release_if_stale", args, false).err()
             }
-            "current_week" => match self.contract.try_current_week() {
-                Ok(Ok(week)) => {
-                    result = week.to_string();
-                    None
+            "current_week" => {
+                match self.invoke::<u64>("current_week", Vec::new(&self.env), false) {
+                    Ok(week) => {
+                        result = week.to_string();
+                        None
+                    }
+                    Err(failure) => Some(failure),
                 }
-                other => classify(other),
-            },
+            }
             "block" | "unblock" => {
                 self.env.mock_all_auths();
                 self.admin
@@ -317,6 +372,22 @@ impl World<'_> {
             expected_forfeited,
             "{label}: forfeited"
         );
+
+        // A successful commit stores exactly what was asked, and the contract receives exactly it.
+        if step.action == "commit" && step.error.is_empty() {
+            let asked = self.amount(&step.amount);
+            assert_eq!(position.amount, asked, "{label}: stored amount");
+            assert_eq!(
+                position.goal_m,
+                num::<u64>(&step.goal_m),
+                "{label}: stored goal"
+            );
+            assert_eq!(
+                self.token.balance(&self.contract.address),
+                contract_before + asked,
+                "{label}: received"
+            );
+        }
 
         self.assert_balance_invariant(label);
     }
@@ -398,10 +469,13 @@ fn the_constructor_cases_hold() {
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             env.register(Commitment, args);
         }));
-        let failure = if outcome.is_err() {
-            "InvalidConfig"
-        } else {
-            ""
+        // Only the contract's own InvalidConfig counts: any other panic fails the case.
+        let failure = match outcome {
+            Ok(()) => String::new(),
+            Err(payload) if panic_message(payload.as_ref()).contains("Error(Contract, #102)") => {
+                "InvalidConfig".to_string()
+            }
+            Err(payload) => format!("Unexpected({})", panic_message(payload.as_ref())),
         };
         assert_eq!(failure, case.error, "{}", case.name);
     }

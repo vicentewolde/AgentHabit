@@ -265,7 +265,9 @@ El spec (4.2) fija el orden general y deja a T4 el detalle por función. Queda a
 - `settle` y `release_if_stale` no revisan el ancla: una posición existente se comprometió después de ella.
 - `AlreadyCommitted` se aplica a una posición en cualquier estado, también los finales.
 
-La tabla tiene un caso por cada par vecino de cada función.
+La tabla tiene un caso por cada par vecino de cada función, salvo uno: `TokenFailure → BalanceMismatch` en `commit`.
+Ese par necesita un token que cobre comisión, y el SAC nunca la cobra, así que solo lo prueba la suite de EVM
+(`test_CommitRefusesATokenThatChargesAFee`).
 
 **Motivo.** Con el orden fijo, dos fallas simultáneas dan el mismo error en las dos cadenas, y la tabla lo prueba.
 

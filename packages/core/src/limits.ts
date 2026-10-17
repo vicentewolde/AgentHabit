@@ -37,6 +37,9 @@ export interface InstanceTemplate {
   readonly staleAfter: bigint;
 }
 
+const U64_MAX = 2n ** 64n - 1n;
+const I128_MAX = 2n ** 127n - 1n;
+
 const DAY = 86_400n;
 const HOUR = 3_600n;
 
@@ -103,8 +106,22 @@ export function validateParams(params: ContractParams): void {
   if (!(0n < params.grace && params.grace < params.staleAfter)) {
     broken.push("0 < grace < staleAfter");
   }
-  if (params.weekAnchor < 0n) {
-    broken.push("weekAnchor >= 0");
+  // Both contracts store times and goals as u64, and Soroban stores amounts as i128.
+  for (const [name, value] of Object.entries({
+    weekAnchor: params.weekAnchor,
+    weekLen: params.weekLen,
+    grace: params.grace,
+    staleAfter: params.staleAfter,
+    minGoalM: params.minGoalM,
+    maxGoalM: params.maxGoalM,
+  })) {
+    if (value < 0n || value > U64_MAX) broken.push(`${name} fits in u64`);
+  }
+  for (const [name, value] of Object.entries({
+    minAmount: params.minAmount,
+    maxAmount: params.maxAmount,
+  })) {
+    if (value > I128_MAX) broken.push(`${name} fits in i128`);
   }
   if (broken.length > 0) {
     throw new AgentHabitError("InvalidConfig", "Contract parameters break the constructor rules", {

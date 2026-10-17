@@ -28,6 +28,11 @@ export interface TimeWindow {
  * `BeforeAnchor` instead of underflowing, like the contracts.
  */
 export function currentWeek(now: bigint, params: WeekParams): bigint {
+  if (params.weekLen <= 0n) {
+    throw new AgentHabitError("InvalidConfig", "A week must last at least one second", {
+      details: { weekLen: params.weekLen.toString() },
+    });
+  }
   if (now < params.weekAnchor) {
     throw new AgentHabitError("BeforeAnchor", "There is no week before the anchor", {
       details: { now: now.toString(), weekAnchor: params.weekAnchor.toString() },

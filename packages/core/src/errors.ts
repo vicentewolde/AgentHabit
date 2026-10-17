@@ -12,7 +12,7 @@ export type AgentHabitErrorCode =
   | "ConfigError"
   /** Contract parameters break the constructor rules of spec 4.2. */
   | "InvalidConfig"
-  /** A run distance is not a finite, non-negative number of metres. */
+  /** A weekly distance total is negative. */
   | "InvalidDistance"
   /** A network service (RPC, Friendbot) failed or answered something unexpected. */
   | "NetworkError"

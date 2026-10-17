@@ -44,6 +44,13 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
 
 - **T4:** la tabla de casos se regenera con `pnpm run cases:gen`; `pnpm check` falla si `contracts/fixtures/cases.json`
   quedó desactualizado. Los errores del contrato se numeran desde 101 (`A-12`).
+- **Deuda para T6, de la revisión de T4:**
+  - **Firmante genérico.** Que `ChainAdapter` sea genérico en su firmante (`ChainAdapter<S extends ChainSigner>`),
+    para que los adaptadores no necesiten `as`.
+  - **Dirección cero.** El script de despliegue de Avalanche debe rechazar `token` u `oracle` en cero. El
+    constructor EVM no lo hace, por simetría con Soroban.
+  - **Ancla.** El script de despliegue debe verificar que el `week_anchor` de producción sea un lunes a las 00:00 en
+    UTC-3 (`anchor % 604800 == 356400`).
 - **Hackatón Vinny (Avalanche):** se entrega este mismo repo, con el README para jueces del PR #9. Plazo y
   requisitos son supuestos (el usuario solo dio el nombre): ficha y faltantes en
   [HACKATON-VINNY.md](HACKATON-VINNY.md). Lo que falta es el contrato en Fuji (T4 + despliegue de T6) y el video.

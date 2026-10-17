@@ -53,6 +53,16 @@ describe("currentWeek", () => {
     expect(currentWeek(1_000_000n + 10n * 604_800n + 5n, params)).toBe(10n);
   });
 
+  it("rejects a zero-length week with InvalidConfig instead of dividing by zero", () => {
+    const broken = { ...params, weekLen: 0n };
+    expect(
+      hasErrorCode(
+        thrown(() => currentWeek(1_000_000n, broken)),
+        "InvalidConfig",
+      ),
+    ).toBe(true);
+  });
+
   it("only lets users commit to the next week", () => {
     expect(committableWeek(1_000_000n, params)).toBe(1n);
     expect(committableWeek(1_000_000n + 604_799n, params)).toBe(1n);
