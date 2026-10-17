@@ -607,6 +607,36 @@ del 16-dic-2026. Si no alcanza:
 
 **No se cortan:** T4, T6, el ensayo de T8, `release_if_stale` ni el botón "recuperar".
 
+### 8.1 Plan acelerado: el reto del socio empieza el lunes 26-oct (`A-22`)
+
+El 17-oct el usuario fijó una fecha dura: su socio empieza su reto semanal el **lunes 26-oct-2026**, en **testnet con
+USDC de prueba**, con **Freighter (Stellar)** y carreras reales de Strava. T6, T7 y T8 se parten en una parte que
+tiene que estar lista el domingo 25 (`a`) y otra que se hace después (`b`). El contenido y los "Hecho cuando" de
+cada tarea no cambian: solo cambia el orden.
+
+**Lo que fija el calendario.** Solo se compromete la semana siguiente (`A-8`): el socio firma su compromiso **antes
+del lunes 26 a las 00:00 (UTC-3)**. La semana de ese compromiso se liquida el **miércoles 4-nov a las 03:00 UTC**,
+así que el liquidador y el Cron deben estar vivos para esa fecha, pero no para el 26. El ancla de la instancia de
+producción es un lunes ya pasado, porque antes del ancla `commit` falla con `BeforeAnchor`.
+
+| Parte | Qué entrega | Fecha límite |
+|---|---|---|
+| **T6a** Contratos vivos en Stellar | Adaptador de Stellar (lecturas, armar `commit` y `release_if_stale`, y verificar un `commit` por su hash); script de despliegue de la instancia de **producción** de Stellar, con `deployments/stellar-testnet.json`; la API lee los contratos de ese archivo | lun 19 |
+| **T7a** Web mínima, solo Stellar | Conectar Freighter, firmar el vínculo, conectar Strava, comprometer (con la confirmación de `A-10`), estado de la semana (km contra meta, días restantes, enlace al explorador), botón "recuperar" y la página de reglas | mié 21 |
+| **T8a** Publicación en Render | Web y API como servicios web, secretos con `sync: false` y el callback de Strava en el dominio publicado (`A-6` deja de valer) | jue 22 |
+| Ensayo corto | El usuario prueba con una carrera real y su socio prueba conectarse | vie 23 |
+| **T6b** Liquidación y Avalanche | Instancia de ensayo, adaptador y despliegue de Avalanche, liquidador, Cron Job y purga diaria | **mié 4-nov, 03:00 UTC** (dry-run primero, y `live` solo con instrucción del usuario) |
+| **T7b** Web, el resto | Historial, meta sugerida y Avalanche en la web | después |
+| **T8b** Ensayo de punta a punta | Las tres posiciones por cadena, con carreras reales dentro de la hora comprometida | después |
+
+**Sin ensayo previo.** La primera semana real es también la primera prueba de punta a punta. Lo que la protege:
+`release_if_stale` devuelve todo al dueño pasada la ventana (miércoles 9-nov, 00:00 UTC-3 más 7 días), la primera
+liquidación corre en `dry-run` antes que en `live`, y el dinero es de prueba.
+
+**Strava con un tercero.** Una app nueva solo deja entrar al dueño: hay que subir la capacidad a 10 atletas desde el
+panel, lo que no requiere revisión (4.8). Es un invitado antes de la Fase 3; el riesgo de términos de 4.8 sigue
+abierto y no bloquea esta fecha.
+
 ## 9. Riesgos
 
 | Riesgo | Mitigación |
@@ -657,3 +687,4 @@ spec el 16-oct:
 | 2026-10-16 | **Aprobado** por el usuario, con `A-1` a `A-7` como estaban. `pnpm release-stale*` pasa a `ask` en `.claude/settings.json` (`A-7`) |
 | 2026-10-16 | **Tareas agrupadas** a pedido del usuario, para ganar velocidad: 14 tareas pasan a 6, con el mismo contenido y los mismos "Hecho cuando". Equivalencias: T4 = antes T4, T5 y T6 · T5 = antes T8, T9 y T10 · T6 = antes T7 y T11 · T7 = antes T12, T13 y T14 · T8 = antes T15 y T16 · T9 = antes T17. Los filtros de carreras pasan a T5, para que T4 y T5 corran en paralelo. La prueba técnica de Strava deja de parar la tarea. La Fase 2 numera desde T13 |
 | 2026-10-17 | T5: la fila "Tokens" y la de "Listado" de 4.8 apuntan a `A-17` (revocación solo explícita y sin carrera; paginación hasta una página vacía), y el callback de OAuth pasa por la web con la sesión (`A-19`) |
+| 2026-10-17 | **Plan acelerado** (`A-22`, sección 8.1): el socio del usuario empieza su reto el lunes 26-oct, en testnet con Stellar. T6, T7 y T8 se parten en `a` (hasta el domingo 25) y `b` (después). La publicación en Render se adelanta antes del ensayo y el callback de Strava deja de ser `localhost` (`A-6`) |

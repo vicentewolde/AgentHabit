@@ -13,6 +13,7 @@ Estados: `Vigente` · `Superada` · `Pendiente`
 - **`A-8` a `A-11`:** las decidió el usuario el 16-oct, en las preguntas de T3.
 - **`A-12` a `A-14`:** las tomó Claude Code en T4, donde el spec dejaba la cifra o el detalle a esa tarea. Se
   revisan con `/revisar` antes del merge.
+- **`A-22`:** la decidió el usuario el 17-oct, al fijar la fecha del 26-oct para su socio.
 - **`A-15` a `A-21`:** las tomó Claude Code en T5 (`A-19` a `A-21` tras `/revisar`), con lo verificado por `integraciones` en
   `docs/integraciones/strava.md` y `firmas.md`. El usuario pidió seguir sin pedirle aprobación; se revisan con
   `/revisar` antes del merge.
@@ -442,3 +443,27 @@ saber que hubo revocación (`A-10`). Sin la fila, la vería como un error pasaje
 
 **Alternativa descartada:** webhooks de Strava. Exigen un callback público, y la Fase 1 corre en `localhost`
 (`A-6`).
+
+---
+
+### A-22 · Plan acelerado hacia el lunes 26-oct: testnet, Stellar primero y publicación adelantada · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T6, T7 y T8 · Decidido por el usuario
+
+El socio del usuario empieza su reto semanal el lunes 26-oct-2026. Para llegar:
+- **Es testnet con USDC de prueba.** El dinero real exige la Fase 2 (revisión del contrato, mainnet y permiso expreso).
+- **Stellar primero.** El socio usa Freighter. Avalanche en la web, la instancia de ensayo y el adaptador de Avalanche
+  pasan a `b`, después del 26.
+- **T6, T7 y T8 se parten en `a` y `b`** (spec 8.1). La parte `a` es lo que el socio necesita para comprometer antes
+  del domingo 25: contratos de producción desplegados, web mínima y todo publicado en Render. La parte `b` incluye el
+  liquidador, que debe estar vivo el miércoles 4-nov a las 03:00 UTC, cuando se liquida la primera semana.
+- **El callback de Strava deja de ser `localhost`** y pasa al dominio de Render (esto cambia `A-6`).
+- **La capacidad de la app de Strava sube a 10 atletas**, desde el panel y sin revisión, para que el socio pueda
+  conectarse.
+
+**Motivo.** El orden del spec (T6, T7 y T8 completas, y luego una semana real) no llega al 26. Lo que el socio necesita
+ese día es poder comprometer y ver su semana, no que el liquidador esté listo: la liquidación llega nueve días
+después, y `release_if_stale` devuelve todo si algo falla.
+
+**Alternativa descartada:** mainnet para el 26. Hoy el proyecto lo prohíbe antes de la Fase 2, el contrato no tiene
+una revisión externa y no tiene admin ni retiro: un error bloquearía dinero real para siempre. Tampoco se hizo la
+Fase 1 completa antes de invitar a nadie, porque no cabe en 9 días.

@@ -13,20 +13,28 @@
 **Fase anterior:** Fase 0 · Fundamentos, **cerrada** el 16-oct con el tag `v0.0.1`
 ([bitácora](fase-0-fundamentos/BITACORA.md), con la verificación de criterios y la retro).
 **Última tarea terminada:** T5 Strava, API y km de la semana ([PR #12](https://github.com/vicentewolde/AgentHabit/pull/12), mergeado el 17-oct por fast-forward), **con un pendiente explícito**: las pruebas con la cuenta real de Strava (ver "Pendientes del usuario").
-**Siguiente paso:** `/tarea T6` — despliegue en testnet y liquidación. Antes, lo de "Pendientes del usuario" que dice "Para T6".
+**Siguiente paso:** el plan acelerado de `A-22` (spec 8.1): el socio del usuario empieza el **lunes 26-oct** en testnet con Stellar. En curso: T6a, T7a y T8a.
 
 ## Progreso de la Fase 1
 
 Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en el registro de cambios del spec).
 **T4 y T5 son independientes y pueden correr en paralelo,** en dos sesiones.
 
+**Plan acelerado (`A-22`, 17-oct).** El socio del usuario empieza su reto el lunes 26-oct, en testnet y con Stellar.
+Tiene que comprometer antes del domingo 25 a las 23:59 (UTC-3). T6, T7 y T8 se parten en `a` (hasta ese domingo) y `b`
+(después). La primera liquidación es el miércoles 4-nov a las 03:00 UTC: para entonces tiene que estar vivo el
+liquidador, en `dry-run` primero.
+
 | Tarea | Estado | Rama / PR |
 |---|---|---|
 | T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | ✅ terminada | [PR #11](https://github.com/vicentewolde/AgentHabit/pull/11) |
 | T5 Strava, API y km de la semana | ✅ terminada, con un pendiente: pruebas con la cuenta real de Strava | [PR #12](https://github.com/vicentewolde/AgentHabit/pull/12) |
-| T6 Despliegue en testnet y liquidación | ⏳ pendiente | |
-| T7 Web (compromiso, estado de la semana, reglas) | ⏳ pendiente | |
-| T8 Ensayo de punta a punta y publicación en Render | ⏳ pendiente | |
+| **T6a** Contratos vivos en Stellar (adaptador y despliegue de producción) | 🔨 en curso, hasta el lun 19 | `cc/t6a-stellar-produccion` |
+| **T7a** Web mínima, solo Stellar | 🔨 en curso, hasta el mié 21 | |
+| **T8a** Publicación en Render | ⏳ hasta el jue 22 | |
+| T6b Liquidación, Cron, Avalanche e instancia de ensayo | ⏳ **mié 4-nov, 03:00 UTC** | |
+| T7b Web: historial, meta sugerida, Avalanche | ⏳ después | |
+| T8b Ensayo de punta a punta | ⏳ después | |
 | T9 `/fase-cerrar 1` | ⏳ pendiente | |
 
 ## Pendientes del usuario
