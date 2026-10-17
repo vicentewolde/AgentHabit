@@ -1,5 +1,5 @@
 import { AgentHabitError, type ChainId } from "@agenthabit/core";
-import { and, eq, exists, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, exists, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { Database } from "./client.js";
 import {
@@ -339,6 +339,25 @@ export async function registerPosition(
     throw new AgentHabitError("DatabaseError", "An upsert returned no row");
   }
   return stored;
+}
+
+/** The weeks this wallet reported a position for on one contract, newest first. */
+export async function listMirroredWeeks(
+  db: Database,
+  key: { readonly chain: ChainId; readonly contract: string; readonly user: string },
+): Promise<bigint[]> {
+  const rows = await db
+    .select({ weekId: positions.weekId })
+    .from(positions)
+    .where(
+      and(
+        eq(positions.chain, key.chain),
+        eq(positions.contract, key.contract),
+        eq(positions.user, key.user),
+      ),
+    )
+    .orderBy(desc(positions.weekId));
+  return rows.map((row) => row.weekId);
 }
 
 export async function findMirroredPosition(

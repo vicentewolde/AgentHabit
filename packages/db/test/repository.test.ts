@@ -9,6 +9,7 @@ import {
   findSession,
   findStravaConnection,
   findStravaRead,
+  listMirroredWeeks,
   markStravaRevoked,
   type PositionKey,
   purgeExpiredData,
@@ -304,5 +305,23 @@ describe("purgeExpiredData", () => {
       expiredChallenges: 1,
       expiredSessions: 1,
     });
+  });
+});
+
+describe("listMirroredWeeks", () => {
+  it("lists a wallet's reported weeks on one contract, newest first, and nobody else's", async () => {
+    const position = { amount: 200_000_000n, goalM: 10_000n, commitTxHash: "tx", athleteId: 42n };
+    await registerPosition(db, { ...key({ weekId: 1n }), ...position }, NOW);
+    await registerPosition(db, { ...key({ weekId: 3n }), ...position }, NOW);
+    await registerPosition(db, { ...key({ weekId: 2n, user: "GOTHER" }), ...position }, NOW);
+    await registerPosition(db, { ...key({ weekId: 9n, contract: "COTHER" }), ...position }, NOW);
+
+    const weeks = await listMirroredWeeks(db, {
+      chain: "stellar",
+      contract: key().contract,
+      user: key().user,
+    });
+
+    expect(weeks).toEqual([3n, 1n]);
   });
 });

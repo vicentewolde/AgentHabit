@@ -149,12 +149,18 @@ export type WeekView = z.infer<typeof WeekViewSchema>;
 /**
  * `GET /weeks/me`: the current week and the next one (the only one a user can commit to, A-8).
  * `instance` says which contract the weeks belong to.
+ *
+ * `unsettledWeeks` are the earlier weeks whose position is still `Active`, newest first: waiting
+ * for the oracle, or, once `releaseOpensAt` has passed, ready for "recuperar". The release window
+ * opens about nine days after a week starts, when that week is no longer the current or the next
+ * one, so without this list the button could never appear.
  */
 export const WeeksResponseSchema = z.object({
   now: z.string(),
   instance: InstanceInfoSchema,
   currentWeek: WeekViewSchema,
   nextWeek: WeekViewSchema,
+  unsettledWeeks: z.array(WeekViewSchema),
 });
 export type WeeksResponse = z.infer<typeof WeeksResponseSchema>;
 

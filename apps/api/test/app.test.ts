@@ -755,6 +755,78 @@ describe("the week status", () => {
     expect(weeks.currentWeek.totalM).toBeNull();
   });
 
+  it("lists the earlier weeks whose position is still active, so 'recuperar' can appear", async () => {
+    const { wallet, session } = await connectedWallet();
+    // Week 2 is current, so week 0 is over and past its release window.
+    chain.week = 2n;
+    chain.positions.set(`${wallet.address}:0`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+    chain.positions.set(`${wallet.address}:1`, {
+      state: "Returned",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.currentWeek.weekId).toBe("2");
+    expect(weeks.unsettledWeeks.map((week) => week.weekId)).toEqual(["0"]);
+    expect(weeks.unsettledWeeks[0]?.releaseOpensAt).toBe("2026-10-26T03:00:00.000Z");
+    expect(weeks.unsettledWeeks[0]?.position?.state).toBe("Active");
+  });
+
+  it("finds an unsettled week the wallet reported even when it is older than two weeks", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.week = 6n;
+    chain.positions.set(`${wallet.address}:1`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+    await registerPosition(
+      db,
+      {
+        chain: "stellar",
+        contract: CONTRACT,
+        user: wallet.address,
+        weekId: 1n,
+        athleteId: 777n,
+        amount: 200_000_000n,
+        goalM: 12_000n,
+        commitTxHash: TX,
+      },
+      clock,
+    );
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.unsettledWeeks.map((week) => week.weekId)).toEqual(["1"]);
+    expect(weeks.unsettledWeeks[0]?.position?.commitTxHash).toBe(TX);
+  });
+
+  it("has no unsettled weeks when everything earlier is final, and never another wallet's", async () => {
+    const mine = await connectedWallet();
+    const other = await connectedWallet();
+    chain.week = 3n;
+    chain.positions.set(`${mine.wallet.address}:1`, {
+      state: "Forfeited",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+    chain.positions.set(`${other.wallet.address}:1`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", mine.session)).json());
+
+    expect(weeks.unsettledWeeks).toEqual([]);
+  });
+
   it("needs a session", async () => {
     expect((await get("/weeks/me")).status).toBe(401);
   });

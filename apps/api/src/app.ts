@@ -40,6 +40,7 @@ import {
   findStravaConnection,
   findStravaRead,
   findWalletLink,
+  listMirroredWeeks,
   markStravaRevoked,
   registerPosition,
   saveStravaConnection,
@@ -138,6 +139,9 @@ export interface ApiDeps {
   readonly randomBytes: (size: number) => Buffer;
   readonly log: (line: string) => void;
 }
+
+/** How many earlier weeks `/weeks/me` looks at: the oracle settles or the release opens within two. */
+const UNSETTLED_LOOKBACK = 8;
 
 /** A Strava reading is reused for this long, so refreshing the page does not spend the limit. */
 const KM_CACHE_MS = 10 * 60_000;
@@ -347,11 +351,31 @@ export function createApp(deps: ApiDeps): Hono {
     const owner = await session(c);
     const backend = backendFor(owner.chain);
     const current = await backend.currentWeek();
+
+    // Earlier weeks that may still hold money: the two before this one, and any the wallet
+    // reported. The chain says which are still `Active`.
+    const candidates = new Set<bigint>();
+    for (const back of [1n, 2n]) if (current >= back) candidates.add(current - back);
+    const reported = await listMirroredWeeks(deps.db, {
+      chain: owner.chain,
+      contract: backend.instance.contract,
+      user: owner.address,
+    });
+    for (const weekId of reported) if (weekId < current) candidates.add(weekId);
+    const unsettledWeeks: WeekView[] = [];
+    for (const weekId of [...candidates]
+      .sort((a, b) => (a < b ? 1 : -1))
+      .slice(0, UNSETTLED_LOOKBACK)) {
+      const view = await weekView(backend, owner, weekId, false);
+      if (view.position?.state === "Active") unsettledWeeks.push(view);
+    }
+
     const response: WeeksResponse = {
       now: deps.now().toISOString(),
       instance: backend.instance,
       currentWeek: await weekView(backend, owner, current, true),
       nextWeek: await weekView(backend, owner, current + 1n, false),
+      unsettledWeeks,
     };
     return c.json(response);
   });
