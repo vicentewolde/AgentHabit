@@ -7,6 +7,10 @@ Cada tag se crea solo con permiso del usuario.
 ## [Sin publicar]
 
 ### Añadido
+- **La web en español, solo Stellar (T7a):** el usuario vincula su wallet Freighter, conecta Strava, compromete entre
+  20 y 50 USDC con su meta semanal, ve el estado de su semana y recupera el depósito si el oráculo no liquidó a tiempo.
+  Si el contrato rechaza una operación, dice por qué (por ejemplo, falta USDC de prueba) y enlaza al faucet de Circle.
+  Un compromiso firmado no se pierde si se cae la red. Probada con una wallet simulada; Freighter real, en el ensayo.
 - **Contratos vivos en Stellar (T6a):** el contrato de producción está desplegado en Stellar testnet, con el comando
   para desplegarlo, la conexión con el contrato y la API de la web (estado de la semana, comprometer y recuperar).
   `pnpm run smoke:stellar` comprueba el contrato real sin enviar nada. Cuando el contrato rechaza una operación, la API

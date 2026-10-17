@@ -25,8 +25,8 @@ Tareas agrupadas el 16-oct para ganar velocidad (equivalencias en el registro de
 |---|---|
 | T4 Núcleo y contratos | ✅ terminada |
 | T5 Strava, API y km de la semana | ✅ terminada, con un pendiente |
-| T6 Despliegue en testnet y liquidación | ⏳ pendiente |
-| T7 Web | ⏳ pendiente |
+| T6 Despliegue en testnet y liquidación | 🔨 T6a ✅ terminada; T6b pendiente |
+| T7 Web | 🔨 T7a ✅ terminada (solo Stellar); T7b pendiente |
 | T8 Ensayo de punta a punta y publicación en Render | ⏳ pendiente |
 | T9 `/fase-cerrar 1` | ⏳ pendiente |
 
@@ -227,3 +227,45 @@ para el ensayo del viernes 23.
 **Decisiones nuevas.** `A-22` (el plan), `A-23` (la API arma y reenvía) y `A-24` (cómo despliega el comando).
 
 **Evidencia.** [`evidencia/T6a.md`](evidencia/T6a.md).
+
+---
+
+## T7a · Web mínima, solo Stellar
+
+Segunda parte de T7 bajo el plan acelerado (`A-22`): lo que el socio del usuario ve y toca para comprometer antes del
+domingo 25.
+
+**Qué quedó funcionando.** Una página en español donde el usuario puede, de punta a punta:
+1. **Vincular su wallet Freighter** firmando un mensaje (no mueve dinero).
+2. **Conectar Strava** y ver los kilómetros de la semana.
+3. **Comprometer** entre 20 y 50 USDC con una meta semanal, firmando una sola transacción en Freighter.
+4. **Ver el estado de su semana** y de las anteriores que siguen abiertas.
+5. **Recuperar** el depósito cuando el oráculo no liquidó a tiempo (`release_if_stale`).
+6. Leer las **reglas** en una página aparte: qué pasa si cumple, qué pasa si falla y que nadie cobra.
+
+Cuando el contrato rechaza una operación, la pantalla dice por qué en palabras llanas: no hay suficiente USDC, falta
+la línea de confianza de USDC (con un enlace al faucet de Circle), ya hay un compromiso esa semana, la semana cambió, la
+meta o el monto están fuera de rango, etc.
+
+**Cuidados con el dinero** (`A-25`):
+- Solo firma lo que el usuario confirmó: si la API arma una transacción para otra semana, la web no pide la firma.
+- Un compromiso firmado se guarda en el navegador hasta que la API lo registre, para no perderlo si se cae la red.
+- Una transacción pendiente se consulta hasta un minuto antes de decir que falló.
+- No muestra datos de un usuario a otro: cada vista sale solo de la sesión de su wallet.
+
+**Para probarla sin red:** `pnpm run web:mock-api` y `pnpm run web:dev` levantan una API de mentira con los estados
+posibles (sin USDC, sin línea de confianza, transacción pendiente, sesión vencida, etc.). Solo para desarrollo.
+
+**Revisión.** Dos revisiones independientes del diff antes del merge; las correcciones (confirmar la semana antes de
+firmar, no perder un compromiso firmado, decir la verdad sobre lo que es público, endurecer la redirección de Strava,
+los decimales del token y la URL de la API) están en los commits `fix(web)`.
+
+**Lo que no se hizo / no se verificó.**
+- **Freighter real.** Toda la web se probó con una wallet simulada y la API de mentira; la firma real se prueba en el
+  ensayo del viernes 23.
+- **El cuerpo real del 422** de la API: se probó contra el mismo esquema compartido, no en un navegador.
+- Historial, meta sugerida, Avalanche y otras wallets son T7b.
+
+**Decisiones nuevas.** `A-25`.
+
+**Evidencia.** [`evidencia/T7a.md`](evidencia/T7a.md).

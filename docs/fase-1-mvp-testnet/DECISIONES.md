@@ -518,3 +518,32 @@ de enviarlo. Conservar el ancla evita que repetir el script cambie qué semana e
 
 **Alternativa descartada:** pedir confirmación por teclado. Los permisos del proyecto ya piden el OK del usuario para
 cada `pnpm run deploy:*`, y un `--yes` explícito deja el comando exacto en la historia de la sesión.
+
+---
+
+### A-25 · La web falla con sus propios errores tipados y firma solo lo que el usuario confirmó · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T7a
+
+La web (solo Stellar, `A-22`) sigue estas reglas:
+- **Tres clases de falla, cada una con su `code`:** `AgentHabitError` para lo que responde la API (con el `reason` del
+  contrato), `WalletError` para lo que pasa en la wallet y `WebError` (`WeekChanged`, `ReleaseWeekMismatch`,
+  `CommitPending`, `ServerResponse`, `WebConfig`) para lo que solo existe en el navegador. Ningún `throw new Error`
+  genérico, y un motivo desconocido nunca se muestra en crudo: cae en el mensaje genérico.
+- **Firma solo lo confirmado.** Antes de pedir la firma, la web compara la semana de la transacción que armó la API con
+  la que el usuario confirmó; si no coinciden, no firma.
+- **Un `commit` firmado no se pierde.** Se guarda en `localStorage` (solo datos públicos de la cadena: contrato,
+  semana, XDR firmado y hash) hasta que la API lo registre. Reenviarlo es seguro porque la transacción se identifica
+  por su hash. El token de sesión solo vive en `sessionStorage`.
+- **Una transacción `PENDING` se consulta hasta un minuto** (`GET /tx/{hash}`) antes de rendirse.
+- **Cuando el contrato rechaza, la web explica por qué** y, si falta USDC o su línea de confianza, enlaza al faucet de
+  Circle.
+- **Solo la wallet Freighter**, empaquetada sin CDN (`P-7`). Los cuatro paquetes opcionales que trae el kit de
+  wallets quedan con `allowBuilds: false`, cada uno con su motivo.
+- **CSP escrita en el build** y `VITE_API_URL` obligatorio y `https:` en producción, sin valor por defecto.
+
+**Motivo.** El usuario firma dinero real de testnet desde un navegador: lo que se firma tiene que ser lo que se
+confirmó, y un compromiso ya firmado no puede quedar sin registrar por una caída de red.
+
+**Alternativa descartada:** reutilizar solo `AgentHabitError` para todo. Mezcla fallas de la red, de la wallet y de la
+interfaz, y la pantalla no podría decidir qué decirle al usuario ni cuándo reintentar.
+

@@ -13,7 +13,7 @@
 **Fase anterior:** Fase 0 · Fundamentos, **cerrada** el 16-oct con el tag `v0.0.1`
 ([bitácora](fase-0-fundamentos/BITACORA.md), con la verificación de criterios y la retro).
 **Última tarea terminada:** T5 Strava, API y km de la semana ([PR #12](https://github.com/vicentewolde/AgentHabit/pull/12), mergeado el 17-oct por fast-forward), **con un pendiente explícito**: las pruebas con la cuenta real de Strava (ver "Pendientes del usuario").
-**Siguiente paso:** el plan acelerado de `A-22` (spec 8.1): el socio del usuario empieza el **lunes 26-oct** en testnet con Stellar. En curso: T6a, T7a y T8a.
+**Siguiente paso:** el plan acelerado de `A-22` (spec 8.1): el socio del usuario empieza el **lunes 26-oct** en testnet con Stellar. T6a y T7a terminadas; en curso: T8a (publicar en Render).
 
 ## Progreso de la Fase 1
 
@@ -30,7 +30,7 @@ liquidador, en `dry-run` primero.
 | T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | ✅ terminada | [PR #11](https://github.com/vicentewolde/AgentHabit/pull/11) |
 | T5 Strava, API y km de la semana | ✅ terminada, con un pendiente: pruebas con la cuenta real de Strava | [PR #12](https://github.com/vicentewolde/AgentHabit/pull/12) |
 | **T6a** Contratos vivos en Stellar (adaptador y despliegue de producción) | ✅ terminada: contrato de producción desplegado el 17-oct | [PR #13](https://github.com/vicentewolde/AgentHabit/pull/13) y su PR de cierre |
-| **T7a** Web mínima, solo Stellar | 🔨 en curso, hasta el mié 21 | |
+| **T7a** Web mínima, solo Stellar | ✅ terminada el 17-oct (Freighter real sin probar: ensayo del vie 23) | `cc/t7a-web-stellar` |
 | **T8a** Publicación en Render | 🔨 `render.yaml` y la guía listos; falta publicar, hasta el jue 22 | `cc/t8a-render` |
 | T6b Liquidación, Cron, Avalanche e instancia de ensayo | ⏳ **mié 4-nov, 03:00 UTC** | |
 | T7b Web: historial, meta sugerida, Avalanche | ⏳ después | |
