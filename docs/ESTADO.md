@@ -6,14 +6,14 @@
 > Leyenda: ⏳ pendiente · 🔨 en curso · 👀 en revisión · ✅ terminada · ⛔ bloqueada ·
 > ✂️ cortada · ⏸ en pausa
 
-**Actualizado:** 2026-10-16
+**Actualizado:** 2026-10-17
 **Fase en curso:** Fase 1 · MVP en testnet. Su spec es [fase-1-mvp-testnet/SPEC.md](fase-1-mvp-testnet/SPEC.md)
 (**Aprobado** el 16-oct), con las decisiones `A-1` a `A-14` (`A-12` a `A-14` de T4).
 
 **Fase anterior:** Fase 0 · Fundamentos, **cerrada** el 16-oct con el tag `v0.0.1`
 ([bitácora](fase-0-fundamentos/BITACORA.md), con la verificación de criterios y la retro).
-**Última tarea terminada:** T3 `/fase-plan 1` ([PR #5](https://github.com/vicentewolde/AgentHabit/pull/5), mergeado el 16-oct por fast-forward).
-**Siguiente paso:** `/revisar` de T4 (rama `cc/t4-nucleo-y-contratos`). En paralelo, en otra sesión, `/tarea T5` — Strava, API y km de la semana.
+**Última tarea terminada:** T4 Núcleo y contratos ([PR #11](https://github.com/vicentewolde/AgentHabit/pull/11), mergeado el 17-oct por fast-forward).
+**Siguiente paso:** `/tarea T5` — Strava, API y km de la semana (necesita la app de Strava y Neon). Después, `/tarea T6` — despliegue en testnet y liquidación.
 
 ## Progreso de la Fase 1
 
@@ -22,7 +22,7 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
 
 | Tarea | Estado | Rama / PR |
 |---|---|---|
-| T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | 👀 en revisión | `cc/t4-nucleo-y-contratos` |
+| T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | ✅ terminada | [PR #11](https://github.com/vicentewolde/AgentHabit/pull/11) |
 | T5 Strava, API y km de la semana | ⏳ pendiente | |
 | T6 Despliegue en testnet y liquidación | ⏳ pendiente | |
 | T7 Web (compromiso, estado de la semana, reglas) | ⏳ pendiente | |

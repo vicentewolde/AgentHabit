@@ -13,9 +13,9 @@
 
 ## Estado actual
 
-**Fecha:** 2026-10-16 · **Fase en curso** desde el cierre de la Fase 0 (`v0.0.1`). Spec **Aprobado** en T3.
-T4 implementada en `cc/t4-nucleo-y-contratos`, en revisión: los dos contratos existen y pasan la misma tabla de
-casos. Siguiente: `/revisar`; después T5 (puede correr en paralelo) y T6.
+**Fecha:** 2026-10-17 · **Fase en curso** desde el cierre de la Fase 0 (`v0.0.1`). Spec **Aprobado** en T3.
+T4 terminada ([PR #11](https://github.com/vicentewolde/AgentHabit/pull/11)): los dos contratos existen y pasan la misma tabla de casos, sin desplegar todavía. Siguiente:
+T5 (Strava, API y km de la semana) y después T6 (despliegue en testnet y liquidación).
 
 ## Progreso
 
@@ -23,7 +23,7 @@ Tareas agrupadas el 16-oct para ganar velocidad (equivalencias en el registro de
 
 | Tarea | Estado |
 |---|---|
-| T4 Núcleo y contratos | 👀 en revisión |
+| T4 Núcleo y contratos | ✅ terminada |
 | T5 Strava, API y km de la semana | ⏳ pendiente |
 | T6 Despliegue en testnet y liquidación | ⏳ pendiente |
 | T7 Web | ⏳ pendiente |
@@ -84,5 +84,8 @@ bloqueantes: ningún camino saca fondos hacia alguien que no sea el dueño. Hubo
 También entraron sugerencias baratas: un caso de compromiso en el primer segundo de la semana 0, rangos `u64` e
 `i128` en `validateParams`, y la excepción de `BalanceMismatch` escrita en `A-14`. Tres sugerencias son de T6 y
 quedaron como deuda en `docs/ESTADO.md`.
+
+**Cierre.** [PR #11](https://github.com/vicentewolde/AgentHabit/pull/11), con los tres jobs de CI en verde sobre `8407442`. El job de Soroban compiló el mismo wasm que la Mac
+(`d044c26e…`): local y CI construyen lo mismo. Merge por fast-forward a `main` el 17-oct.
 
 **Evidencia.** [`evidencia/T4.md`](evidencia/T4.md).
