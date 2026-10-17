@@ -42,6 +42,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   return {
     plugins: [react(), tailwindcss(), securityHeaders(env.VITE_API_URL ?? "http://localhost:3000")],
+    // The web origin is part of what the wallet signs and of Strava's redirect (STRAVA_REDIRECT_URI),
+    // so a busy port must fail loudly instead of moving to another one.
+    server: { port: 5173, strictPort: true },
+    preview: { port: 4173, strictPort: true },
     build: { outDir: "dist/site", sourcemap: false },
   };
 });
