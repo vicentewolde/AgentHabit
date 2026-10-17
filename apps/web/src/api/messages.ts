@@ -29,21 +29,13 @@ const MESSAGES: Record<AgentHabitErrorCode, string> = {
     "No pudimos leer todas tus carreras de la semana. Intenta de nuevo más tarde.",
   DatabaseError: "Algo falló en el servidor. Intenta de nuevo en un momento.",
   TokenDecryptFailed: "Algo falló en el servidor. Intenta de nuevo en un momento.",
-};
-
-/**
- * Codes the API can answer that are not in `AgentHabitErrorCode` yet. The client keeps them in
- * `details.apiCode`; once they join the union, they move into `MESSAGES` above.
- */
-const EXTRA_MESSAGES: Readonly<Record<string, string>> = {
-  ContractRejected:
-    "El contrato rechazó la operación. Revisa el monto y la meta, y que no tengas ya un compromiso para esa semana.",
+  ContractRejected: "El contrato no aceptó la operación. Revisa el monto, la meta y la semana.",
   AccountNotFunded:
     "Tu cuenta de Stellar todavía no existe en la red de pruebas: no tiene XLM para pagar la comisión. Cárgala con el faucet (friendbot) de la testnet y vuelve a intentar.",
-  TransactionNotAllowed:
-    "Esa transacción no está permitida. Vuelve a prepararla desde aquí e intenta de nuevo.",
   DeploymentDrift:
     "El servicio no está listo todavía: hay una diferencia con el contrato desplegado. Intenta más tarde.",
+  TransactionNotAllowed:
+    "Esa transacción no está permitida. Vuelve a prepararla desde aquí e intenta de nuevo.",
 };
 
 const SERVICE_NOT_READY = "El servicio no está listo todavía. Intenta de nuevo más tarde.";
@@ -63,10 +55,6 @@ export function messageFor(error: unknown): string {
     return WALLET_MESSAGES[error.code];
   }
   if (isAgentHabitError(error)) {
-    const apiCode = error.details.apiCode;
-    if (typeof apiCode === "string" && Object.hasOwn(EXTRA_MESSAGES, apiCode)) {
-      return EXTRA_MESSAGES[apiCode] ?? MESSAGES[error.code];
-    }
     // ConfigError arrives as a 503: the service is up but not ready.
     if (error.code === "ConfigError" && error.details.status === 503) return SERVICE_NOT_READY;
     return MESSAGES[error.code];

@@ -99,9 +99,8 @@ export function createApiClient(options: ApiClientOptions) {
           : response.status === 401
             ? "Unauthenticated"
             : "NetworkError";
-      // Codes the API has that `@agenthabit/core` does not list yet travel in `details.apiCode`.
       throw new AgentHabitError(code, `The API answered ${response.status}`, {
-        details: { path: req.path, status: response.status, apiCode },
+        details: { path: req.path, status: response.status },
       });
     }
 
@@ -181,6 +180,15 @@ export function createApiClient(options: ApiClientOptions) {
         path: "/tx/release",
         schema: PreparedTxResponseSchema,
         body: { weekId },
+        auth: true,
+      }),
+
+    /** `GET /tx/{hash}`: where a submitted transaction stands (same shape as the submit answer). */
+    txStatus: (hash: string) =>
+      request({
+        method: "GET",
+        path: `/tx/${encodeURIComponent(hash)}`,
+        schema: SubmitTxResponseSchema,
         auth: true,
       }),
 
