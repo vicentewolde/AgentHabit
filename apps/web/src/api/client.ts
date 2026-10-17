@@ -101,10 +101,12 @@ export function createApiClient(options: ApiClientOptions) {
     if (!response.ok) {
       const failure = ErrorResponseSchema.safeParse(payload);
       const apiCode = failure.success ? failure.data.error : undefined;
+      // `reason` says why the contract or the token refused (ContractRejected only).
+      const reason = failure.success ? failure.data.reason : undefined;
       if (response.status === 401 && req.auth) options.onUnauthorized();
       if (apiCode !== undefined && isKnownCode(apiCode)) {
         throw new AgentHabitError(apiCode, `The API answered ${response.status}`, {
-          details: { path: req.path, status: response.status },
+          details: { path: req.path, status: response.status, reason },
         });
       }
       if (response.status === 401) {

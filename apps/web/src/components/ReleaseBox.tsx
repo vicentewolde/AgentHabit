@@ -1,14 +1,14 @@
 import type { InstanceInfo } from "@agenthabit/core";
 import { useState } from "react";
-import { messageFor } from "../api/messages.js";
+import { describeError } from "../api/messages.js";
 import { useApp } from "../app-context.js";
 import { runRelease } from "../flows.js";
-import { Button, ExplorerLink, Notice } from "./ui.js";
+import { Button, ExplorerLink, FaucetLink, Notice } from "./ui.js";
 
 type Result =
   | { readonly kind: "none" }
   | { readonly kind: "working"; readonly waiting: boolean }
-  | { readonly kind: "error"; readonly message: string }
+  | { readonly kind: "error"; readonly message: string; readonly faucet: boolean }
   | {
       readonly kind: "done";
       readonly status: "SUCCESS" | "FAILED" | "PENDING";
@@ -41,7 +41,7 @@ export function ReleaseBox(props: {
       });
       setResult({ kind: "done", status: outcome.status, hash: outcome.txHash });
     } catch (error) {
-      setResult({ kind: "error", message: messageFor(error) });
+      setResult({ kind: "error", ...describeError(error) });
     }
   };
 
@@ -53,7 +53,12 @@ export function ReleaseBox(props: {
         depósito a su dueño. Al pulsar el botón, tu billetera te pide firmar y el dinero vuelve a tu
         billetera, no a otra.
       </p>
-      {result.kind === "error" && <Notice tone="error">{result.message}</Notice>}
+      {result.kind === "error" && (
+        <Notice tone="error">
+          {result.message}
+          {result.faucet && <FaucetLink />}
+        </Notice>
+      )}
       {result.kind === "done" && (
         <Notice tone={result.status === "SUCCESS" ? "success" : "warning"}>
           {result.status === "SUCCESS" && "Listo: tu depósito volvió a tu billetera. "}

@@ -50,6 +50,39 @@ const WALLET_MESSAGES = {
   WalletFailed: "Tu billetera no pudo completar la solicitud.",
 } as const;
 
+/**
+ * Why the contract or the token refused an operation (`ContractRejected` + `reason`). Anything not
+ * listed here (including the contract's other error names) falls back to the generic message.
+ */
+const REASON_MESSAGES: Readonly<Record<string, string>> = {
+  InsufficientBalance:
+    "No tienes suficiente USDC de prueba en esta wallet. Pide USDC en el faucet de Circle y vuelve a intentarlo.",
+  NoUsdcTrustline:
+    "Tu wallet todavía no puede guardar USDC. En Freighter agrega el activo USDC de testnet y pide USDC en el faucet de Circle.",
+  AlreadyCommitted: "Ya tienes un compromiso para esa semana.",
+  AmountOutOfRange: "El monto o la meta están fuera de los límites. Revisa el rango permitido.",
+  GoalOutOfRange: "El monto o la meta están fuera de los límites. Revisa el rango permitido.",
+  WrongWeek: "La semana cambió. Revisa las fechas y confirma de nuevo.",
+  NotStaleYet: "Todavía no se puede recuperar este depósito: espera la fecha indicada.",
+  PositionNotFound: "No hay un depósito activo para recuperar en esa semana.",
+  PositionNotActive: "No hay un depósito activo para recuperar en esa semana.",
+  TokenBlocked: "El token bloqueó esta wallet; no se puede completar la operación.",
+};
+
+/** The reasons for which the user needs USDC of test: they get a link to the faucet. */
+const FAUCET_REASONS: readonly string[] = ["InsufficientBalance", "NoUsdcTrustline"];
+
+export const CIRCLE_FAUCET_URL = "https://faucet.circle.com/";
+
+/** The `reason` an API refusal carried, if it is a contract rejection that has one. */
+export function reasonOf(error: unknown): string | undefined {
+  if (isAgentHabitError(error) && error.code === "ContractRejected") {
+    const reason = error.details.reason;
+    return typeof reason === "string" ? reason : undefined;
+  }
+  return undefined;
+}
+
 const WEB_MESSAGES: Record<WebErrorCode, string> = {
   WeekChanged: "La semana cambió mientras confirmabas. Revisa las fechas y confirma de nuevo.",
   ReleaseWeekMismatch:
@@ -69,9 +102,22 @@ export function messageFor(error: unknown): string {
     return WEB_MESSAGES[error.code];
   }
   if (isAgentHabitError(error)) {
+    const reason = reasonOf(error);
+    if (reason !== undefined && Object.hasOwn(REASON_MESSAGES, reason)) {
+      return REASON_MESSAGES[reason] ?? MESSAGES[error.code];
+    }
     // ConfigError arrives as a 503: the service is up but not ready.
     if (error.code === "ConfigError" && error.details.status === 503) return SERVICE_NOT_READY;
     return MESSAGES[error.code];
   }
   return "Algo salió mal. Intenta de nuevo en un momento.";
+}
+
+/** The text to show for a failure, and whether to put the Circle faucet link next to it. */
+export function describeError(error: unknown): { message: string; faucet: boolean } {
+  const reason = reasonOf(error);
+  return {
+    message: messageFor(error),
+    faucet: reason !== undefined && FAUCET_REASONS.includes(reason),
+  };
 }

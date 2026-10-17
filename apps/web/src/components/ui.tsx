@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { CIRCLE_FAUCET_URL } from "../api/messages.js";
 
 export function Card(props: {
   readonly title: string;
@@ -57,6 +58,20 @@ export function Notice(props: {
     >
       {props.children}
     </div>
+  );
+}
+
+/** The link next to "you need test USDC" messages. */
+export function FaucetLink() {
+  return (
+    <a
+      href={CIRCLE_FAUCET_URL}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="ml-1 font-medium text-blue-800 underline"
+    >
+      Abrir el faucet de Circle
+    </a>
   );
 }
 

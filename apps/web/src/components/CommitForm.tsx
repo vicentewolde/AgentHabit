@@ -1,13 +1,13 @@
 import type { InstanceInfo, WeekView } from "@agenthabit/core";
 import { type FormEvent, useId, useState } from "react";
 import { type CommitFormErrors, formatKm, formatUsdc, validateCommit } from "../amounts.js";
-import { messageFor } from "../api/messages.js";
+import { describeError, reasonOf } from "../api/messages.js";
 import { useApp } from "../app-context.js";
 import { failureSentence, REVOKE_SENTENCE } from "../copy.js";
 import { isWebError } from "../errors.js";
 import { type CommitStep, runCommit, type TxOutcome } from "../flows.js";
 import { formatMoment } from "../time.js";
-import { Button, ExplorerLink, Notice } from "./ui.js";
+import { Button, ExplorerLink, FaucetLink, Notice } from "./ui.js";
 
 type Phase =
   | { readonly kind: "form" }
@@ -46,7 +46,7 @@ export function CommitForm(props: {
   const [goalText, setGoalText] = useState("");
   const [errors, setErrors] = useState<CommitFormErrors>({});
   const [phase, setPhase] = useState<Phase>({ kind: "form" });
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ message: string; faucet: boolean } | null>(null);
 
   const limits = {
     minAmount: BigInt(instance.minAmount),
@@ -84,19 +84,23 @@ export function CommitForm(props: {
         onStep: (step) => setPhase({ kind: "working", step }),
       });
       if (outcome.status === "FAILED") {
-        setFailure(
-          "La transacción falló en la cadena y no se bloqueó tu depósito. Revisa que tengas USDC de prueba y XLM para la comisión, e intenta de nuevo.",
-        );
+        setFailure({
+          message:
+            "La transacción falló en la cadena y no se bloqueó tu depósito. Revisa que tengas USDC de prueba y XLM para la comisión, e intenta de nuevo.",
+          faucet: false,
+        });
         setPhase({ kind: "form" });
         return;
       }
       setPhase({ kind: "done", outcome, amount });
       props.onDone();
     } catch (error) {
-      setFailure(messageFor(error));
+      setFailure(describeError(error));
       setPhase({ kind: "form" });
       // The dates on screen are stale: reload so the form shows the real next week.
-      if (isWebError(error) && error.code === "WeekChanged") props.onStale();
+      if ((isWebError(error) && error.code === "WeekChanged") || reasonOf(error) === "WrongWeek") {
+        props.onStale();
+      }
     }
   };
 
@@ -180,7 +184,12 @@ export function CommitForm(props: {
           el depósito.
         </Notice>
       )}
-      {failure !== null && <Notice tone="error">{failure}</Notice>}
+      {failure !== null && (
+        <Notice tone="error">
+          {failure.message}
+          {failure.faucet && <FaucetLink />}
+        </Notice>
+      )}
 
       <div>
         <label htmlFor={amountId} className="block font-medium">
