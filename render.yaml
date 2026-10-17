@@ -1,0 +1,73 @@
+# Render Blueprint for AgentHabit (T8a, A-22): the API and the web, published so the partner can
+# commit before Sunday 25 Oct. The daily settler Cron Job joins in T6b (before Wed 4 Nov).
+#
+# Secrets are `sync: false`: Render asks for them when the Blueprint is first created and they never
+# live in this repo. The API holds NO signing key: it only builds transactions for wallets to sign.
+#
+# Commands use `npx pnpm@11.24.0` so the build does not depend on pnpm being preinstalled
+# (the version is the root package.json `packageManager`). `--prod=false` keeps tsx, which runs the
+# API straight from source.
+services:
+  - type: web
+    name: agenthabit-api
+    runtime: node
+    # Node 22 comes from .nvmrc (P-5). Render has no Sao Paulo region; Virginia is the closest.
+    region: virginia
+    plan: free
+    buildCommand: npx --yes pnpm@11.24.0 install --frozen-lockfile --prod=false
+    startCommand: npx --yes pnpm@11.24.0 run api:start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      # Render sends traffic to this port.
+      - key: PORT
+        value: "10000"
+      - key: API_PORT
+        value: "10000"
+      # Public endpoints, safe to keep here.
+      - key: STELLAR_RPC_URL
+        value: https://soroban-testnet.stellar.org
+      - key: AVALANCHE_FUJI_RPC_URL
+        value: https://api.avax-test.network/ext/bc/C/rpc
+      # Secrets and per-deployment values, asked for at creation.
+      - key: DATABASE_URL
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: STRAVA_CLIENT_ID
+        sync: false
+      - key: STRAVA_CLIENT_SECRET
+        sync: false
+      # https://<the web's address>/strava/callback
+      - key: STRAVA_REDIRECT_URI
+        sync: false
+      # The web's origin, e.g. https://agenthabit-web.onrender.com (also the CORS origin).
+      - key: WEB_ORIGIN
+        sync: false
+
+  - type: web
+    name: agenthabit-web
+    runtime: static
+    buildCommand: npx --yes pnpm@11.24.0 install --frozen-lockfile --prod=false && npx --yes pnpm@11.24.0 --filter @agenthabit/web build
+    staticPublishPath: apps/web/dist/site
+    autoDeployTrigger: commit
+    envVars:
+      # The API's public address, baked in at build time, e.g. https://agenthabit-api.onrender.com
+      - key: VITE_API_URL
+        sync: false
+    # Single-page app: every path that is not a file serves index.html.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      # The Strava callback carries a one-time code in its URL: never leak it in a Referer.
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
