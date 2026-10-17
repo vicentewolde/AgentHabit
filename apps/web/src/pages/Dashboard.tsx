@@ -1,5 +1,6 @@
 import type { ConfigResponse, InstanceInfo, MeResponse, WeeksResponse } from "@agenthabit/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { assertStellarUsdc } from "../amounts.js";
 import { messageFor } from "../api/messages.js";
 import { useApp } from "../app-context.js";
 import { CommitForm } from "../components/CommitForm.js";
@@ -18,6 +19,8 @@ interface Loaded {
   readonly config: ConfigResponse;
   readonly me: MeResponse;
   readonly weeks: WeeksResponse;
+  /** Checked once on load (a bad instance is an error screen, not a crash while rendering). */
+  readonly instance: InstanceInfo;
   /** `Date.now()` when the answer arrived, to keep counting from the server's `now`. */
   readonly loadedAtMs: number;
   /** A signed commit of this wallet that is still waiting to be confirmed or recorded. */
@@ -32,10 +35,10 @@ type LoadState =
 /** The instance the web shows: the one the weeks belong to, with the limits `/config` gives. */
 export function pickInstance(config: ConfigResponse, weeks: WeeksResponse): InstanceInfo {
   const stellar = config.instances.filter((instance) => instance.chain === "stellar");
-  return (
+  return assertStellarUsdc(
     stellar.find((instance) => instance.contract === weeks.instance.contract) ??
-    stellar.find((instance) => instance.kind === "production") ??
-    weeks.instance
+      stellar.find((instance) => instance.kind === "production") ??
+      weeks.instance,
   );
 }
 
@@ -61,6 +64,7 @@ export function Dashboard() {
         ]);
         // If the leftover was just recorded, the weeks read above may predate it.
         const weeks = reconciled.result === "mirrored" ? await api.weeks() : firstWeeks;
+        const instance = pickInstance(config, weeks);
         if (mine !== latest.current) return;
         setState({
           kind: "ready",
@@ -68,6 +72,7 @@ export function Dashboard() {
             config,
             me,
             weeks,
+            instance,
             loadedAtMs: Date.now(),
             pending: reconciled.pending,
           },
@@ -120,8 +125,7 @@ export function Dashboard() {
     );
   }
 
-  const { config, me, weeks, loadedAtMs, pending } = state.data;
-  const instance = pickInstance(config, weeks);
+  const { config, me, weeks, instance, loadedAtMs, pending } = state.data;
   const nowMs = Date.parse(weeks.now) + (Date.now() - loadedAtMs);
   const reload = () => load(true);
   const nextEmpty = weeks.nextWeek.position === null;
@@ -131,7 +135,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4">
-      <StravaCard connected={me.stravaConnected} onChanged={reload} />
+      <StravaCard connected={me.stravaConnected} onChanged={reload} webOrigin={config.webOrigin} />
       <Card title="Esta semana" headingId="h-current">
         <WeekCard
           week={weeks.currentWeek}

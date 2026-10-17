@@ -1,4 +1,5 @@
-import { USDC_DECIMALS, usdcToUnits } from "@agenthabit/core";
+import { type InstanceInfo, USDC_DECIMALS, usdcToUnits } from "@agenthabit/core";
+import { WebError } from "./errors.js";
 
 /**
  * Amounts and goals as the form reads them. Money is a `bigint` in the token's smallest unit and
@@ -7,8 +8,7 @@ import { USDC_DECIMALS, usdcToUnits } from "@agenthabit/core";
  */
 
 const STELLAR_DECIMALS = USDC_DECIMALS.stellar;
-/** The form takes cents, not the seven decimals the token has. */
-const AMOUNT_DECIMALS_SHOWN = 2;
+/** The form takes cents, not the seven decimals the token has (what is shown never truncates). */
 
 const AMOUNT_RE = /^(\d{1,12})(?:[.,](\d{1,2}))?$/;
 const KM_RE = /^(\d{1,6})(?:[.,](\d{1,3}))?$/;
@@ -22,12 +22,12 @@ export function parseUsdc(text: string): bigint | null {
   return usdcToUnits(whole, "stellar") + fraction;
 }
 
-/** Stellar USDC units to text for people: "25", "25,5". */
+/** Stellar USDC units to text for people, exact: "25", "25,5", "25,0000001". */
 export function formatUsdc(units: bigint): string {
   const scale = 10n ** BigInt(STELLAR_DECIMALS);
   const whole = units / scale;
   const fraction = (units % scale).toString().padStart(STELLAR_DECIMALS, "0");
-  const shown = fraction.slice(0, AMOUNT_DECIMALS_SHOWN).replace(/0+$/, "");
+  const shown = fraction.replace(/0+$/, "");
   return shown === "" ? whole.toString() : `${whole.toString()},${shown}`;
 }
 
@@ -45,6 +45,17 @@ export function formatKm(metres: number): string {
   const km = Math.floor(metres / 1000);
   const rest = (metres % 1000).toString().padStart(3, "0").replace(/0+$/, "");
   return rest === "" ? km.toString() : `${km},${rest}`;
+}
+
+/** Amounts are converted with Stellar's 7 decimals: refuse an instance that says otherwise. */
+export function assertStellarUsdc(instance: InstanceInfo): InstanceInfo {
+  if (instance.tokenDecimals !== USDC_DECIMALS.stellar) {
+    throw new WebError(
+      "WebConfig",
+      `The instance's token has ${instance.tokenDecimals} decimals, not ${USDC_DECIMALS.stellar}`,
+    );
+  }
+  return instance;
 }
 
 export interface CommitLimits {

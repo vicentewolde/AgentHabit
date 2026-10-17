@@ -16,7 +16,11 @@ import {
   WeeksResponseSchema,
 } from "@agenthabit/core";
 import type { z } from "zod";
+import { WebError } from "../errors.js";
 import { KNOWN_ERROR_CODES } from "./messages.js";
+
+/** Render's free tier can take about a minute to wake up. */
+export const REQUEST_TIMEOUT_MS = 60_000;
 
 /**
  * The web's side of `packages/core/src/api-contract.ts`. Every response is parsed with the same
@@ -31,6 +35,8 @@ export interface ApiClientOptions {
   /** Injected for tests; defaults to the browser's `fetch`. */
   readonly fetch?: typeof fetch;
   readonly getToken: () => string | null;
+  /** Defaults to 60 s. */
+  readonly timeoutMs?: number;
   /** Called once per 401 on an authenticated request, after which the caller drops the session. */
   readonly onUnauthorized: () => void;
 }
@@ -74,8 +80,11 @@ export function createApiClient(options: ApiClientOptions) {
         credentials: "omit",
         cache: "no-store",
         referrerPolicy: "no-referrer",
+        signal: AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
       });
     } catch (cause) {
+      // Only a real failure to talk to the server (no connection, no answer in time) is a
+      // network failure; every other bad outcome below is the server answering badly.
       throw new AgentHabitError("NetworkError", "The API did not answer", {
         cause,
         details: { path: req.path },
@@ -93,21 +102,29 @@ export function createApiClient(options: ApiClientOptions) {
       const failure = ErrorResponseSchema.safeParse(payload);
       const apiCode = failure.success ? failure.data.error : undefined;
       if (response.status === 401 && req.auth) options.onUnauthorized();
-      const code: AgentHabitErrorCode =
-        apiCode !== undefined && isKnownCode(apiCode)
-          ? apiCode
-          : response.status === 401
-            ? "Unauthenticated"
-            : "NetworkError";
-      throw new AgentHabitError(code, `The API answered ${response.status}`, {
-        details: { path: req.path, status: response.status },
-      });
+      if (apiCode !== undefined && isKnownCode(apiCode)) {
+        throw new AgentHabitError(apiCode, `The API answered ${response.status}`, {
+          details: { path: req.path, status: response.status },
+        });
+      }
+      if (response.status === 401) {
+        throw new AgentHabitError("Unauthenticated", "The API answered 401", {
+          details: { path: req.path, status: 401 },
+        });
+      }
+      throw new WebError(
+        "ServerResponse",
+        `The API answered ${response.status} with no known code`,
+        {
+          status: response.status,
+        },
+      );
     }
 
     const parsed = req.schema.safeParse(payload);
     if (!parsed.success) {
-      throw new AgentHabitError("NetworkError", "The API answered a shape the contract rules out", {
-        details: { path: req.path, status: response.status },
+      throw new WebError("ServerResponse", "The API answered a shape the contract rules out", {
+        status: response.status,
       });
     }
     return parsed.data;

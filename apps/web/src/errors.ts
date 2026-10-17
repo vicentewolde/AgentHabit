@@ -17,10 +17,13 @@ export type WebErrorCode =
 export class WebError extends Error {
   override readonly name = "WebError";
   readonly code: WebErrorCode;
+  /** The HTTP status, when the error comes from an answer of the API. */
+  readonly status: number | undefined;
 
-  constructor(code: WebErrorCode, message: string, options?: { cause?: unknown }) {
-    super(message, options);
+  constructor(code: WebErrorCode, message: string, options?: { cause?: unknown; status?: number }) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.code = code;
+    this.status = options?.status;
   }
 }
 

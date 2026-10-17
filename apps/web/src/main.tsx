@@ -12,13 +12,20 @@ import "./styles.css";
 const returned =
   routeFor(window.location.pathname) === "stravaCallback" ? takeStravaReturn() : undefined;
 
-const rootElement = document.getElementById("root");
-if (rootElement !== null) {
+function startUp(rootElement: HTMLElement) {
+  let baseUrl: string;
+  try {
+    baseUrl = apiBaseUrl();
+  } catch {
+    rootElement.textContent =
+      "La web no está bien configurada (falta la dirección del servidor). Avísale a quien te invitó.";
+    return;
+  }
   createRoot(rootElement).render(
     <StrictMode>
       <AppProvider
         deps={{
-          baseUrl: apiBaseUrl(),
+          baseUrl,
           wallet: createFreighterWallet(),
           redirect: (url) => window.location.assign(url),
         }}
@@ -28,3 +35,6 @@ if (rootElement !== null) {
     </StrictMode>,
   );
 }
+
+const rootElement = document.getElementById("root");
+if (rootElement !== null) startUp(rootElement);

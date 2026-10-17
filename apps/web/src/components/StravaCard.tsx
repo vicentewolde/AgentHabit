@@ -2,10 +2,32 @@ import { useState } from "react";
 import { messageFor } from "../api/messages.js";
 import { useApp } from "../app-context.js";
 import { REVOKE_SENTENCE } from "../copy.js";
+import { WebError } from "../errors.js";
 import { Button, Card, Notice } from "./ui.js";
 
+/**
+ * Where the browser may be sent to authorize Strava: Strava's own authorization page over https,
+ * or this web's own callback page (what the dev mock API answers). Anything else is refused, so a
+ * wrong answer from the API cannot send the user to another site.
+ */
+export function isAllowedStravaUrl(raw: string, webOrigin: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "https:" && url.hostname === "www.strava.com") return true;
+  return url.origin === webOrigin && url.pathname === "/strava/callback";
+}
+
 /** Connect or disconnect Strava. Disconnecting counts as failing the week (A-10). */
-export function StravaCard(props: { readonly connected: boolean; readonly onChanged: () => void }) {
+export function StravaCard(props: {
+  readonly connected: boolean;
+  readonly onChanged: () => void;
+  /** The web's own origin, from `/config`, for the dev-only direct callback. */
+  readonly webOrigin: string;
+}) {
   const { api, redirect } = useApp();
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -16,8 +38,10 @@ export function StravaCard(props: { readonly connected: boolean; readonly onChan
     setError(null);
     try {
       const { url } = await api.stravaConnect();
-      if (!/^https?:\/\//.test(url)) {
-        setError(messageFor(undefined));
+      if (!isAllowedStravaUrl(url, props.webOrigin)) {
+        setError(
+          messageFor(new WebError("ServerResponse", "The API sent an unexpected Strava URL")),
+        );
         setBusy(false);
         return;
       }

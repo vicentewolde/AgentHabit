@@ -7,7 +7,7 @@ import {
   type VerifyResponse,
 } from "@agenthabit/core";
 import type { ApiClient } from "./api/client.js";
-import { WebError } from "./errors.js";
+import { isWebError, WebError } from "./errors.js";
 import { clearPending, loadPending, type PendingCommit, savePending } from "./pending.js";
 import type { WalletPort } from "./wallet/port.js";
 
@@ -105,8 +105,11 @@ function assertPrepared(
 
 /** A 4xx the API means for good (not a lost session, a timeout or a rate limit): do not retry. */
 function isDefinitiveRefusal(error: unknown): boolean {
-  if (!isAgentHabitError(error)) return false;
-  const status = error.details.status;
+  const status = isWebError(error)
+    ? error.status
+    : isAgentHabitError(error)
+      ? error.details.status
+      : undefined;
   return (
     typeof status === "number" && status >= 400 && status < 500 && ![401, 408, 429].includes(status)
   );

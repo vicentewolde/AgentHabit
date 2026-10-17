@@ -1,6 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
+import { parseApiUrl } from "./src/api-url.js";
 import { contentSecurityPolicy } from "./src/csp.js";
 
 /**
@@ -40,8 +41,10 @@ function securityHeaders(apiUrl: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  // A production build fails here, loudly, unless VITE_API_URL is set and https.
+  const apiUrl = parseApiUrl(env.VITE_API_URL, mode === "production");
   return {
-    plugins: [react(), tailwindcss(), securityHeaders(env.VITE_API_URL ?? "http://localhost:3000")],
+    plugins: [react(), tailwindcss(), securityHeaders(apiUrl)],
     // The web origin is part of what the wallet signs and of Strava's redirect (STRAVA_REDIRECT_URI),
     // so a busy port must fail loudly instead of moving to another one.
     server: { port: 5173, strictPort: true },

@@ -56,7 +56,7 @@ const WEB_MESSAGES: Record<WebErrorCode, string> = {
     "La transacción preparada no corresponde a la semana que elegiste. Actualiza la página e intenta de nuevo.",
   CommitPending:
     "Tienes una transacción en espera. Cuando se confirme, tu compromiso aparecerá aquí; no hace falta firmar de nuevo.",
-  ServerResponse: "El servidor no respondió bien. Intenta de nuevo en un minuto.",
+  ServerResponse: "El servidor no respondió bien, intenta de nuevo en un minuto.",
   WebConfig: "La web no está bien configurada. Avísale a quien te invitó.",
 };
 
