@@ -8,7 +8,7 @@ import {
   Keypair,
   nativeToScVal,
   Operation,
-  type rpc,
+  rpc,
   TransactionBuilder,
   xdr,
 } from "@stellar/stellar-sdk";
@@ -124,7 +124,7 @@ export function createSdkDeployer(options: SdkDeployerOptions): StellarDeployer 
         await server.getContractData(
           contract,
           xdr.ScVal.scvLedgerKeyContractInstance(),
-          "persistent" as rpc.Durability.Persistent,
+          rpc.Durability.Persistent,
         );
       } catch (error) {
         // The SDK throws `{ code: 404 }` for a ledger entry that does not exist. Any other failure

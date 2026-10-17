@@ -207,6 +207,14 @@ OK del usuario.
   No deja comprometer sin Strava conectado, y solo reenvía las dos llamadas permitidas (`A-23`).
 - **El contrato entre la web y la API**, escrito una vez con esquemas compartidos.
 
+**Revisión (`/revisar`).** No hubo bloqueantes. Entre las correcciones:
+- **`/weeks/me` ahora lista las semanas anteriores que siguen activas** (`unsettledWeeks`), porque el plazo para
+  recuperar se abre cuando la semana ya no es la actual ni la siguiente: sin eso "recuperar" no aparecía nunca.
+- **La API no arranca** si el archivo de despliegue y el contrato de la red no coinciden.
+- **Un `commit` exige Strava vivo** también al enviarlo, no solo al armarlo.
+
+El detalle está en [`evidencia/T6a.md`](evidencia/T6a.md).
+
 **Lo que falta de T6a.** Desplegar (con OK, y con el código ya en `main` para que el comando lea tu `.env.local`),
 comprometer una vez desde el usuario de prueba para ver el contrato funcionando en la red y guardar las salidas.
 

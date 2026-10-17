@@ -221,11 +221,23 @@ funds):
 pnpm run db:migrate
 ```
 
-Plan the deployment of the production instance to Stellar testnet (sends nothing; add `--yes` to
-send, with the user's OK):
+Plan the deployment of the production instance to Stellar testnet (sends nothing, and shows the
+anchor and which week a commit made now targets):
 
 ```bash
 pnpm run deploy:stellar
+```
+
+Send it, with the user's OK (it writes `deployments/stellar-testnet.json`):
+
+```bash
+pnpm run deploy:stellar --yes
+```
+
+After a testnet reset has erased the recorded contract, deploy a new one:
+
+```bash
+pnpm run deploy:stellar --yes --reset
 ```
 
 Run the API on `API_PORT` (default 3000), reading `.env.local`:

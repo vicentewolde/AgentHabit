@@ -46,8 +46,6 @@ export const POSITION_STATE_BY_INDEX: readonly PositionState[] = [
   "ReleasedStale",
 ];
 
-const RELAYED_FUNCTIONS = new Set(["commit", "release_if_stale"]);
-
 const PositionSchema = z.object({
   amount: z.bigint(),
   goal_m: z.bigint(),
@@ -96,6 +94,8 @@ export interface PreparedTransaction {
 export interface DecodedCall {
   /** The transaction's source account. */
   readonly source: string;
+  /** The operation's own source, when it sets one (it then needs that account's signature too). */
+  readonly operationSource: string | undefined;
   readonly contract: string;
   readonly fn: string;
   readonly args: readonly xdr.ScVal[];
@@ -131,6 +131,7 @@ export function decodeContractCall(
   const call = func.invokeContract;
   return {
     source: parsed.source,
+    operationSource: operation.source,
     contract: Address.fromScAddress(call.contractAddress).toString(),
     fn: call.functionName.toString(),
     args: call.args,
@@ -143,6 +144,14 @@ export function contractErrorFrom(message: string): { name: string | null; code:
   if (match?.[1] === undefined) return null;
   const code = Number(match[1]);
   return { name: CONTRACT_ERRORS.find((error) => error.code === code)?.name ?? null, code };
+}
+
+/** The SDK reports a missing ledger entry as `{ code: 404 }` or as an error saying "not found". */
+function isNotFound(error: unknown): boolean {
+  if (typeof error === "object" && error !== null && "code" in error && error.code === 404) {
+    return true;
+  }
+  return error instanceof Error && /not found/i.test(error.message);
 }
 
 function networkError(action: string, cause: unknown): AgentHabitError {
@@ -269,18 +278,7 @@ export class StellarContractClient {
     signedXdr: string,
     owner: string,
   ): Promise<{ txHash: string; status: SubmitStatus }> {
-    const call = decodeContractCall(signedXdr, this.networkPassphrase);
-    const aboutOwner = call.args[0] !== undefined && scValToNative(call.args[0]) === owner;
-    if (
-      call.contract !== this.contractId ||
-      !RELAYED_FUNCTIONS.has(call.fn) ||
-      call.source !== owner ||
-      !aboutOwner
-    ) {
-      throw new AgentHabitError("TransactionNotAllowed", "This call is not relayed", {
-        details: { fn: call.fn },
-      });
-    }
+    this.relayedFunction(signedXdr, owner);
     const transaction = TransactionBuilder.fromXDR(signedXdr, this.networkPassphrase);
     let sent: Awaited<ReturnType<SorobanServer["sendTransaction"]>>;
     try {
@@ -293,6 +291,34 @@ export class StellarContractClient {
       throw networkError("send the transaction, the network asked to try again", sent.status);
     }
     return { txHash: sent.hash, status: await this.#wait(sent.hash) };
+  }
+
+  /**
+   * The relay rule: a single contract call, on this contract, to `commit` or `release_if_stale`,
+   * from the session's wallet (the transaction and the operation) and about that wallet's own
+   * position. Returns which function it is; throws `TransactionNotAllowed` for anything else.
+   */
+  relayedFunction(signedXdr: string, owner: string): "commit" | "release_if_stale" {
+    const call = decodeContractCall(signedXdr, this.networkPassphrase);
+    let aboutOwner = false;
+    try {
+      aboutOwner = call.args[0] !== undefined && scValToNative(call.args[0]) === owner;
+    } catch {
+      // An argument of a type these calls never take: not relayed.
+    }
+    const ownOperation = call.operationSource === undefined || call.operationSource === owner;
+    if (
+      call.contract !== this.contractId ||
+      (call.fn !== "commit" && call.fn !== "release_if_stale") ||
+      call.source !== owner ||
+      !ownOperation ||
+      !aboutOwner
+    ) {
+      throw new AgentHabitError("TransactionNotAllowed", "This call is not relayed", {
+        details: { fn: call.fn },
+      });
+    }
+    return call.fn;
   }
 
   async transactionStatus(txHash: string): Promise<SubmitStatus> {
@@ -378,11 +404,16 @@ export class StellarContractClient {
     try {
       account = await this.#server.getAccount(user);
     } catch (cause) {
-      throw new AgentHabitError(
-        "AccountNotFunded",
-        "The wallet has no account on the network yet: it needs XLM for fees",
-        { cause },
-      );
+      // Only "the network does not know this account" means it is not funded: an RPC that is
+      // down is a network problem, and telling the user to fund a wallet would be wrong.
+      if (isNotFound(cause)) {
+        throw new AgentHabitError(
+          "AccountNotFunded",
+          "The wallet has no account on the network yet: it needs XLM for fees",
+          { cause },
+        );
+      }
+      throw networkError("read the wallet's account", cause);
     }
     const transaction = new TransactionBuilder(account, {
       fee: BASE_FEE,

@@ -24,8 +24,14 @@ export const ApiEnvSchema = z.object({
   STRAVA_REDIRECT_URI: z.url({ protocol: /^https?$/ }),
   STRAVA_API_BASE_URL: z.url({ protocol: /^https$/ }).default("https://www.strava.com/api/v3"),
   STRAVA_OAUTH_BASE_URL: z.url({ protocol: /^https$/ }).default("https://www.strava.com/oauth"),
-  /** The web's origin: the link message names it, and the OAuth callback returns to it. */
-  WEB_ORIGIN: z.url({ protocol: /^https?$/ }).default("http://localhost:5173"),
+  /**
+   * The web's origin: the link message names it and CORS compares it exactly. A trailing slash or
+   * a path would break every call from the browser, so only the origin is kept.
+   */
+  WEB_ORIGIN: z
+    .url({ protocol: /^https?$/ })
+    .transform((value) => new URL(value).origin)
+    .default("http://localhost:5173"),
   API_PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
 });
 

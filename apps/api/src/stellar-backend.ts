@@ -67,6 +67,35 @@ export function createStellarBackend(input: {
     prepareCommit: (call) => client.prepareCommit(call),
     prepareRelease: (call) => client.prepareRelease(call),
     submit: (signedXdr, owner) => client.submit(signedXdr, owner),
+    relayedFunction: (signedXdr, owner) => client.relayedFunction(signedXdr, owner),
+    verify: async () => {
+      // The deployments file is what the web shows (dates, limits); the contract is what decides.
+      // They must agree, or the page would promise a time the contract refuses.
+      const onChain = await client.config();
+      const mismatches = (
+        [
+          ["token", onChain.token === instance.token],
+          ["oracle", onChain.oracle === instance.oracle],
+          ["minAmount", onChain.minAmount.toString() === params.minAmount],
+          ["maxAmount", onChain.maxAmount.toString() === params.maxAmount],
+          ["minGoalM", onChain.minGoalM.toString() === params.minGoalM],
+          ["maxGoalM", onChain.maxGoalM.toString() === params.maxGoalM],
+          ["weekAnchor", onChain.weekAnchor.toString() === params.weekAnchor],
+          ["weekLen", onChain.weekLen.toString() === params.weekLen],
+          ["grace", onChain.grace.toString() === params.grace],
+          ["staleAfter", onChain.staleAfter.toString() === params.staleAfter],
+        ] as const
+      )
+        .filter(([, same]) => !same)
+        .map(([name]) => name);
+      if (mismatches.length > 0) {
+        throw new AgentHabitError(
+          "DeploymentDrift",
+          "deployments/stellar-testnet.json disagrees with the contract on the network",
+          { details: { contract: instance.contract, fields: mismatches } },
+        );
+      }
+    },
     transactionStatus: (txHash) => client.transactionStatus(txHash),
     verifyCommit: (call) => client.verifyCommit(call),
   };

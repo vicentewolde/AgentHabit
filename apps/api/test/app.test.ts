@@ -23,6 +23,7 @@ import {
   findWalletLink,
   parseTokenKey,
   registerPosition,
+  saveStravaRead,
   upsertWalletLink,
 } from "@agenthabit/db";
 import { createTestDatabase } from "@agenthabit/db/testing";
@@ -60,6 +61,8 @@ const chain = {
   verified: new Map<string, { amount: bigint; goalM: bigint }>(),
   calls: [] as string[],
   reject: null as AgentHabitError | null,
+  /** Makes the next read blow up with an error that is not one of ours. */
+  crash: false,
 };
 /** What Strava would answer, and how often it was asked. */
 const strava_ = { totalM: 7_500n, reads: 0, refreshes: 0, fails: false };
@@ -110,7 +113,10 @@ const instance: InstanceInfo = {
 const backend: ChainBackend = {
   instance,
   weekParams: { weekAnchor: ANCHOR, weekLen: 604_800n, grace: 172_800n, staleAfter: 604_800n },
-  currentWeek: async () => chain.week,
+  currentWeek: async () => {
+    if (chain.crash) throw new TypeError("boom: raw detail that must never leave the server");
+    return chain.week;
+  },
   getPosition: async (user, weekId) =>
     chain.positions.get(`${user}:${weekId}`) ?? { state: "None", amount: 0n, goalM: 0n },
   prepareCommit: async (call) => {
@@ -128,6 +134,11 @@ const backend: ChainBackend = {
     if (chain.reject !== null) throw chain.reject;
     return { txHash: TX, status: "SUCCESS" };
   },
+  relayedFunction: (signedXdr) => {
+    if (chain.reject !== null) throw chain.reject;
+    return signedXdr.includes("release") ? "release_if_stale" : "commit";
+  },
+  verify: async () => {},
   transactionStatus: async () => "PENDING",
   verifyCommit: async ({ user, weekId, txHash }) =>
     chain.verified.get(`${user}:${weekId}:${txHash}`) ?? null,
@@ -145,6 +156,7 @@ beforeEach(async () => {
   chain.verified.clear();
   chain.calls.length = 0;
   chain.reject = null;
+  chain.crash = false;
   Object.assign(strava_, { totalM: 7_500n, reads: 0, refreshes: 0, fails: false });
   exchange = async (_code, scope) => ({
     accessToken: ACCESS,
@@ -827,6 +839,86 @@ describe("the week status", () => {
     expect(weeks.unsettledWeeks).toEqual([]);
   });
 
+  it("still shows a commit the web never reported, weeks later: it can always be recovered", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.week = 5n;
+    chain.positions.set(`${wallet.address}:2`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.unsettledWeeks.map((week) => week.weekId)).toEqual(["2"]);
+    expect(weeks.unsettledWeeks[0]?.position?.commitTxHash).toBeNull();
+  });
+
+  it("finds an old stuck week among many settled ones: it filters before it limits", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.week = 20n;
+    for (let weekId = 1n; weekId <= 11n; weekId++) {
+      chain.positions.set(`${wallet.address}:${weekId}`, {
+        state: weekId === 1n ? "Active" : "Returned",
+        amount: 200_000_000n,
+        goalM: 12_000n,
+      });
+      await registerPosition(
+        db,
+        {
+          chain: "stellar",
+          contract: CONTRACT,
+          user: wallet.address,
+          weekId,
+          athleteId: 777n,
+          amount: 200_000_000n,
+          goalM: 12_000n,
+          commitTxHash: TX,
+        },
+        clock,
+      );
+    }
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.unsettledWeeks.map((week) => week.weekId)).toEqual(["1"]);
+  });
+
+  it("never shows a Strava reading older than seven days, even when Strava is down", async () => {
+    const { wallet, session } = await connectedWallet();
+    chain.positions.set(`${wallet.address}:1`, {
+      state: "Active",
+      amount: 200_000_000n,
+      goalM: 12_000n,
+    });
+    await saveStravaRead(db, {
+      chain: "stellar",
+      contract: CONTRACT,
+      user: wallet.address,
+      weekId: 1n,
+      totalM: 9_999n,
+      activityIds: ["1"],
+      readAt: new Date(clock.getTime() - 8 * 24 * 3_600_000),
+    });
+    strava_.fails = true;
+
+    const weeks = WeeksResponseSchema.parse(await (await get("/weeks/me", session)).json());
+
+    expect(weeks.currentWeek.totalM).toBeNull();
+  });
+
+  it("answers an error that is not one of ours with a generic code, and logs it as unexpected", async () => {
+    const { session } = await connectedWallet();
+    chain.crash = true;
+
+    const response = await get("/weeks/me", session);
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "DatabaseError" });
+    expect(logs.at(-1)).toBe("GET /weeks/me 500 Unexpected");
+    expect(logs.join("\n")).not.toContain("boom");
+  });
+
   it("needs a session", async () => {
     expect((await get("/weeks/me")).status).toBe(401);
   });
@@ -912,6 +1004,45 @@ describe("the transactions the wallet signs", () => {
     expect(chain.calls).toEqual([`submit:${wallet.address}:AAAA-signed`]);
   });
 
+  it("refuses to relay a commit once Strava was disconnected after the transaction was built", async () => {
+    const { session } = await connectedWallet();
+    await app.request("/strava/disconnect", { method: "POST", headers: bearer(session) });
+
+    const response = await app.request("/tx/submit", json({ xdr: "AAAA-signed" }, bearer(session)));
+
+    expect(response.status).toBe(400);
+    expect(chain.calls.filter((call) => call.startsWith("submit"))).toEqual([]);
+  });
+
+  it("relays a recover even with Strava disconnected: getting the money back never depends on it", async () => {
+    const { session } = await connectedWallet();
+    await app.request("/strava/disconnect", { method: "POST", headers: bearer(session) });
+
+    const response = await app.request(
+      "/tx/submit",
+      json({ xdr: "AAAA-release" }, bearer(session)),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it("answers 400, not 500, for a number the contract cannot hold", async () => {
+    const { session } = await connectedWallet();
+
+    const week = await app.request(
+      "/tx/release",
+      json({ weekId: "99999999999999999999999" }, bearer(session)),
+    );
+    const amount = await app.request(
+      "/tx/commit",
+      json({ amount: "9".repeat(40), goalM: 15_000 }, bearer(session)),
+    );
+
+    expect(week.status).toBe(400);
+    expect(amount.status).toBe(400);
+    expect(chain.calls).toEqual([]);
+  });
+
   it("answers 400 when the transaction is not one the web is meant to send", async () => {
     const { session } = await connectedWallet();
     chain.reject = new AgentHabitError("TransactionNotAllowed", "not relayed");
@@ -972,5 +1103,32 @@ describe("CORS", () => {
     const response = await get("/config", undefined, { origin: "https://evil.example" });
 
     expect(response.headers.get("access-control-allow-origin")).not.toBe("https://evil.example");
+  });
+});
+
+describe("one wallet never gets another's position", () => {
+  it("refuses to register a commit that another wallet made, even with its real hash", async () => {
+    const owner = await connectedWallet();
+    const intruder = await connectedWallet();
+    // The chain confirms this hash for the owner only.
+    chain.verified.set(`${owner.wallet.address}:3:${TX}`, { amount: 200_000_000n, goalM: 10_000n });
+
+    const response = await app.request(
+      "/positions",
+      json(
+        { chain: "stellar", contract: CONTRACT, weekId: "3", txHash: TX },
+        bearer(intruder.session),
+      ),
+    );
+
+    expect(response.status).toBe(422);
+    expect(
+      await findMirroredPosition(db, {
+        chain: "stellar",
+        contract: CONTRACT,
+        user: intruder.wallet.address,
+        weekId: 3n,
+      }),
+    ).toBeNull();
   });
 });

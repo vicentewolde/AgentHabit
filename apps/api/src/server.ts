@@ -11,7 +11,7 @@ import {
 } from "@agenthabit/chain-stellar";
 import { parseApiEnv, parseEnv } from "@agenthabit/config";
 import { AgentHabitError, type ChainId, liveInstance, parseDeployments } from "@agenthabit/core";
-import { createDatabase, parseTokenKey } from "@agenthabit/db";
+import { createDatabase, parseTokenKey, purgeExpiredData } from "@agenthabit/db";
 import { StravaClient } from "@agenthabit/strava";
 import { serve } from "@hono/node-server";
 import { rpc } from "@stellar/stellar-sdk";
@@ -42,11 +42,25 @@ if (existsSync(stellarFile)) {
 if (Object.keys(backends).length === 0) {
   throw new AgentHabitError(
     "ConfigError",
-    "No deployed instance: run `pnpm run deploy:stellar -- --yes` first",
+    "No deployed instance: run `pnpm run deploy:stellar --yes` first",
   );
 }
 
+// The deployments file is what the web shows; the contract is what decides. If they disagree the
+// page would promise times and limits the contract refuses, so the API refuses to start.
+for (const backend of Object.values(backends)) await backend.verify();
+
 const { db } = createDatabase(env.DATABASE_URL);
+
+// Strava data must not outlive 7 days (POL 6.2) and expired link rows are only clutter. T6b's
+// daily Cron Job takes this over; until then the API purges at start-up and every hour.
+const purge = () =>
+  purgeExpiredData(db, new Date()).then(
+    (report) => process.stdout.write(`purge ${JSON.stringify(report)}\n`),
+    () => process.stdout.write("purge failed\n"),
+  );
+await purge();
+setInterval(() => void purge(), 60 * 60_000).unref();
 const app = createApp({
   db,
   tokenKey: parseTokenKey(env.TOKEN_ENCRYPTION_KEY),

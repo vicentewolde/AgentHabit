@@ -17,6 +17,19 @@ export const ChainSchema = z.enum(["stellar", "avalanche"]);
 /** An unsigned integer as a decimal string: amounts in the token's smallest unit, week ids. */
 export const DecimalStringSchema = z.string().regex(/^\d{1,40}$/);
 
+const U64_MAX = 2n ** 64n - 1n;
+const I128_MAX = 2n ** 127n - 1n;
+
+/** A week id the contract can hold (a `u64`): bigger numbers never reach the SDK. */
+export const WeekIdSchema = DecimalStringSchema.refine((value) => BigInt(value) <= U64_MAX, {
+  message: "does not fit a u64",
+});
+
+/** An amount the contract can hold (an `i128`). */
+export const AmountSchema = DecimalStringSchema.refine((value) => BigInt(value) <= I128_MAX, {
+  message: "does not fit an i128",
+});
+
 /** `GET /health` → `{ ok: true }`. */
 
 // --- Public configuration -----------------------------------------------------------------
@@ -168,7 +181,7 @@ export type WeeksResponse = z.infer<typeof WeeksResponseSchema>;
 export const ReportPositionRequestSchema = z.object({
   chain: ChainSchema,
   contract: z.string().min(1).max(100),
-  weekId: DecimalStringSchema,
+  weekId: WeekIdSchema,
   txHash: z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/),
 });
 export const ReportPositionResponseSchema = z.object({
@@ -188,8 +201,8 @@ export const ReportPositionResponseSchema = z.object({
  * `networkPassphrase` and then calls `/tx/submit`.
  */
 export const BuildCommitRequestSchema = z.object({
-  amount: DecimalStringSchema,
-  goalM: z.number().int().positive(),
+  amount: AmountSchema,
+  goalM: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 });
 export const PreparedTxResponseSchema = z.object({
   /** The unsigned transaction envelope, base64 XDR. */
@@ -200,14 +213,15 @@ export const PreparedTxResponseSchema = z.object({
 export type PreparedTxResponse = z.infer<typeof PreparedTxResponseSchema>;
 
 /** `POST /tx/release`: the same for `release_if_stale` ("recuperar") on a week that expired. */
-export const BuildReleaseRequestSchema = z.object({ weekId: DecimalStringSchema });
+export const BuildReleaseRequestSchema = z.object({ weekId: WeekIdSchema });
 
 /**
  * `POST /tx/submit`: sends a signed transaction and waits for the ledger (up to about 30 s).
  * `status` is `SUCCESS` or `FAILED`; a transaction still pending after the wait is `PENDING`, and
  * the web may ask again with the same hash through `GET /tx/{hash}`.
  */
-export const SubmitTxRequestSchema = z.object({ xdr: z.string().min(1).max(20_000) });
+// A signed commit is a few KB of base64; the API refuses any body over 8 KiB.
+export const SubmitTxRequestSchema = z.object({ xdr: z.string().min(1).max(6_000) });
 export const SubmitTxResponseSchema = z.object({
   txHash: z.string(),
   status: z.enum(["SUCCESS", "FAILED", "PENDING"]),

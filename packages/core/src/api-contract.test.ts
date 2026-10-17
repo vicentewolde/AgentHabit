@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   BuildCommitRequestSchema,
+  BuildReleaseRequestSchema,
   DecimalStringSchema,
   PositionViewSchema,
+  ReportPositionRequestSchema,
   SubmitTxResponseSchema,
   WeekViewSchema,
 } from "./api-contract.js";
@@ -45,5 +47,40 @@ describe("the API contract", () => {
     expect(SubmitTxResponseSchema.parse({ txHash: "ab", status: "PENDING" }).status).toBe(
       "PENDING",
     );
+  });
+});
+
+describe("the numbers a request may carry", () => {
+  it("refuses a week id or an amount the contract could not hold, before the SDK sees it", () => {
+    expect(BuildReleaseRequestSchema.safeParse({ weekId: "18446744073709551615" }).success).toBe(
+      true,
+    );
+    expect(BuildReleaseRequestSchema.safeParse({ weekId: "18446744073709551616" }).success).toBe(
+      false,
+    );
+    expect(
+      BuildCommitRequestSchema.safeParse({
+        amount: "170141183460469231731687303715884105727",
+        goalM: 1,
+      }).success,
+    ).toBe(true);
+    expect(
+      BuildCommitRequestSchema.safeParse({
+        amount: "170141183460469231731687303715884105728",
+        goalM: 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      ReportPositionRequestSchema.safeParse({
+        chain: "stellar",
+        contract: "C",
+        weekId: "99999999999999999999999",
+        txHash: "ab".repeat(32),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("refuses a goal beyond a safe integer", () => {
+    expect(BuildCommitRequestSchema.safeParse({ amount: "1", goalM: 2 ** 60 }).success).toBe(false);
   });
 });

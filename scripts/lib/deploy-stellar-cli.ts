@@ -1,9 +1,12 @@
 import { parseEnv } from "@agenthabit/config";
 import {
   AgentHabitError,
+  currentWeek,
+  type DeployedParams,
   type DeploymentsFile,
   isAgentHabitError,
   parseDeployments,
+  weekStart,
 } from "@agenthabit/core";
 import { Asset } from "@stellar/stellar-sdk";
 
@@ -39,6 +42,24 @@ export function stellarUsdcContractId(): string {
 }
 
 const EXPLORER = "https://stellar.expert/explorer/testnet";
+
+/** The anchor and the weeks around now, in UTC, so the user can check which week a commit targets. */
+function describeWeeks(params: DeployedParams, now: Date): string[] {
+  const week = {
+    weekAnchor: BigInt(params.weekAnchor),
+    weekLen: BigInt(params.weekLen),
+    grace: BigInt(params.grace),
+    staleAfter: BigInt(params.staleAfter),
+  };
+  const nowSeconds = BigInt(Math.floor(now.getTime() / 1000));
+  const iso = (seconds: bigint) => new Date(Number(seconds) * 1000).toISOString();
+  const current = currentWeek(nowSeconds, week);
+  return [
+    `  anchor (week 0 starts): ${iso(week.weekAnchor)}`,
+    `  now is week ${current}, which started ${iso(weekStart(current, week))}`,
+    `  a commit made now targets week ${current + 1n}, which starts ${iso(weekStart(current + 1n, week))}`,
+  ];
+}
 
 export async function runDeployStellarCli(deps: DeployCliDeps): Promise<number> {
   const secrets: string[] = [];
@@ -102,6 +123,7 @@ export async function runDeployStellarCli(deps: DeployCliDeps): Promise<number> 
     if (result.outcome === "planned") {
       print("Plan (nothing was sent): deploy the production instance with");
       for (const [name, value] of Object.entries(result.params)) print(`  ${name} = ${value}`);
+      for (const line of describeWeeks(result.params, deps.now())) print(line);
       print("Run again with --yes to send it.");
       return 0;
     }
@@ -111,6 +133,7 @@ export async function runDeployStellarCli(deps: DeployCliDeps): Promise<number> 
     }
     await deps.writeDeployments(result.file);
     print(`Deployed the production instance: ${result.instance.contract}`);
+    for (const line of describeWeeks(result.instance.params, deps.now())) print(line);
     print(`  contract: ${EXPLORER}/contract/${result.instance.contract}`);
     print(`  transaction: ${EXPLORER}/tx/${result.instance.txHash}`);
     print("Recorded in deployments/stellar-testnet.json");
@@ -118,8 +141,12 @@ export async function runDeployStellarCli(deps: DeployCliDeps): Promise<number> 
   } catch (error) {
     const code = isAgentHabitError(error) ? error.code : "Unexpected";
     const message = isAgentHabitError(error) ? error.message : "an unexpected error";
+    // A contract that was created but not recorded must not be lost: its address is public, and
+    // running again would create another one.
+    const contract = isAgentHabitError(error) ? error.details.contract : undefined;
     try {
       printError(`${code}: ${message}`);
+      if (typeof contract === "string") printError(`  contract: ${contract}`);
     } catch {
       printError("SecretLeak: an error line was about to carry a secret");
     }

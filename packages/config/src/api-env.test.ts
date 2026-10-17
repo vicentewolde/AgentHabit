@@ -52,6 +52,15 @@ describe("parseApiEnv", () => {
     );
   });
 
+  it("keeps only the origin of WEB_ORIGIN: CORS compares it exactly", () => {
+    expect(
+      parseApiEnv({ ...BASE, WEB_ORIGIN: "https://agenthabit-web.onrender.com/" }).WEB_ORIGIN,
+    ).toBe("https://agenthabit-web.onrender.com");
+    expect(
+      parseApiEnv({ ...BASE, WEB_ORIGIN: "http://localhost:5173/some/path?x=1" }).WEB_ORIGIN,
+    ).toBe("http://localhost:5173");
+  });
+
   it("treats an empty line as unset", () => {
     expect(
       hasErrorCode(

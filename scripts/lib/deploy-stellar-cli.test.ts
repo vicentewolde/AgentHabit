@@ -25,6 +25,8 @@ const WASM = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
 class FakeDeployer implements StellarDeployer {
   readonly calls: string[] = [];
   readonly contracts = new Map<string, OnChainConfig>();
+  /** Make the contract it creates hold something else, as a broken constructor would. */
+  corruptNext = false;
 
   async upload() {
     this.calls.push("upload");
@@ -38,7 +40,7 @@ class FakeDeployer implements StellarDeployer {
       token: input.token,
       oracle: input.oracle,
       minAmount: BigInt(input.params.minAmount),
-      maxAmount: BigInt(input.params.maxAmount),
+      maxAmount: BigInt(input.params.maxAmount) + (this.corruptNext ? 1n : 0n),
       minGoalM: BigInt(input.params.minGoalM),
       maxGoalM: BigInt(input.params.maxGoalM),
       weekAnchor: BigInt(input.params.weekAnchor),
@@ -109,6 +111,30 @@ describe("pnpm run deploy:stellar", () => {
     expect(written).toEqual([]);
     expect(out.join("\n")).toContain("Run again with --yes");
     expect(out.join("\n")).toContain("minAmount = 200000000");
+  });
+
+  it("shows the anchor and which week a commit made now would target", async () => {
+    const { deps, out } = harness();
+
+    await runDeployStellarCli(deps);
+
+    const text = out.join("\n");
+    // NOW is Wednesday 21 Oct 2026: the default anchor is Monday 19 Oct, 00:00 in UTC-3.
+    expect(text).toContain("anchor (week 0 starts): 2026-10-19T03:00:00.000Z");
+    expect(text).toContain("now is week 0, which started 2026-10-19T03:00:00.000Z");
+    expect(text).toContain(
+      "a commit made now targets week 1, which starts 2026-10-26T03:00:00.000Z",
+    );
+  });
+
+  it("keeps the address of a contract it created but could not confirm, so it is not lost", async () => {
+    const { deps, deployer, err } = harness({ args: ["--yes"] });
+    deployer.corruptNext = true;
+
+    expect(await runDeployStellarCli(deps)).toBe(1);
+
+    expect(err.join("\n")).toContain("DeploymentDrift");
+    expect(err.join("\n")).toContain("contract: CNEWCONTRACT");
   });
 
   it("deploys and records with --yes, then does nothing on a second run", async () => {

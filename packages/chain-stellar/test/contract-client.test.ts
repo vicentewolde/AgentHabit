@@ -2,10 +2,12 @@ import { hasErrorCode, isAgentHabitError } from "@agenthabit/core";
 import {
   Account,
   Address,
+  Asset,
   BASE_FEE,
   Contract,
   Keypair,
   nativeToScVal,
+  Operation,
   StrKey,
   type Transaction,
   TransactionBuilder,
@@ -387,5 +389,107 @@ describe("verifyCommit (spec 4.4, step 2)", () => {
       simulateTransaction: positionOf(2),
     });
     expect(await client(fake.server).verifyCommit(input)).toBeNull();
+  });
+});
+
+describe("the relay rule, case by case", () => {
+  const owner = user.publicKey();
+  const callArgs = () => [
+    new Address(owner).toScVal(),
+    nativeToScVal(3n, { type: "u64" }),
+    nativeToScVal(200_000_000n, { type: "i128" }),
+    nativeToScVal(10_000n, { type: "u64" }),
+  ];
+  const wrap = (operation: xdr.Operation, signer = user) => {
+    const transaction = new TransactionBuilder(new Account(signer.publicKey(), "5"), {
+      fee: BASE_FEE,
+      networkPassphrase: PASSPHRASE,
+    })
+      .addOperation(operation)
+      .setTimeout(300)
+      .build();
+    transaction.sign(signer);
+    return transaction;
+  };
+
+  async function refused(signedXdr: string) {
+    const fake = fakeServer();
+    const error = await failure(client(fake.server).submit(signedXdr, owner));
+    expect(hasErrorCode(error, "TransactionNotAllowed")).toBe(true);
+    expect(fake.sent).toHaveLength(0);
+  }
+
+  it("refuses a fee-bump transaction wrapping the wallet's own commit", async () => {
+    const inner = wrap(new Contract(CONTRACT).call("commit", ...callArgs()));
+    const bump = TransactionBuilder.buildFeeBumpTransaction(stranger, "200", inner, PASSPHRASE);
+    bump.sign(stranger);
+
+    await refused(bump.toXDR());
+  });
+
+  it("refuses an operation that is not a contract call", async () => {
+    await refused(
+      wrap(
+        Operation.payment({
+          destination: stranger.publicKey(),
+          asset: Asset.native(),
+          amount: "1",
+        }),
+      ).toXDR(),
+    );
+  });
+
+  it("refuses an operation that borrows another account as its source", async () => {
+    const operation = Operation.invokeContractFunction({
+      contract: CONTRACT,
+      function: "commit",
+      args: callArgs(),
+      source: stranger.publicKey(),
+    });
+
+    await refused(wrap(operation).toXDR());
+  });
+
+  it("refuses a first argument that is not an address at all", async () => {
+    const contract = new Contract(CONTRACT);
+    const operation = contract.call(
+      "commit",
+      nativeToScVal("not-an-address"),
+      nativeToScVal(3n, { type: "u64" }),
+    );
+
+    await refused(wrap(operation).toXDR());
+  });
+
+  it("relays the wallet's own release_if_stale and says which function it is", async () => {
+    const release = wrap(
+      new Contract(CONTRACT).call(
+        "release_if_stale",
+        callArgs()[0] as xdr.ScVal,
+        nativeToScVal(3n, { type: "u64" }),
+      ),
+    ).toXDR();
+    const fake = fakeServer();
+
+    expect(client(fake.server).relayedFunction(release, owner)).toBe("release_if_stale");
+    expect((await client(fake.server).submit(release, owner)).status).toBe("SUCCESS");
+    expect(fake.sent).toHaveLength(1);
+  });
+});
+
+describe("telling an unfunded account from a network failure", () => {
+  it("does not tell the user to fund a wallet when the RPC itself is down", async () => {
+    const fake = fakeServer({ getAccount: new TypeError("fetch failed") });
+
+    const error = await failure(
+      client(fake.server).prepareCommit({
+        user: user.publicKey(),
+        weekId: 3n,
+        amount: 1n,
+        goalM: 1n,
+      }),
+    );
+
+    expect(hasErrorCode(error, "NetworkError")).toBe(true);
   });
 });

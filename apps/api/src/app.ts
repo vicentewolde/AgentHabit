@@ -43,6 +43,7 @@ import {
   listMirroredWeeks,
   markStravaRevoked,
   registerPosition,
+  STRAVA_RETENTION_MS,
   saveStravaConnection,
   saveStravaRead,
   type TokenKey,
@@ -116,6 +117,13 @@ export interface ChainBackend {
     signedXdr: string,
     owner: string,
   ): Promise<{ txHash: string; status: "SUCCESS" | "FAILED" | "PENDING" }>;
+  /**
+   * Which function a signed transaction calls, if it passes the relay rule: throws
+   * `TransactionNotAllowed` otherwise. The API applies per-function rules with it.
+   */
+  relayedFunction(signedXdr: string, owner: string): "commit" | "release_if_stale";
+  /** Checks the deployments file against what the contract says, and throws `DeploymentDrift`. */
+  verify(): Promise<void>;
   transactionStatus(txHash: string): Promise<"SUCCESS" | "FAILED" | "PENDING">;
   /** The position a confirmed commit created, read on-chain (spec 4.4, step 2), or null. */
   verifyCommit(input: {
@@ -140,8 +148,12 @@ export interface ApiDeps {
   readonly log: (line: string) => void;
 }
 
-/** How many earlier weeks `/weeks/me` looks at: the oracle settles or the release opens within two. */
-const UNSETTLED_LOOKBACK = 8;
+/**
+ * How many earlier weeks `/weeks/me` always looks at, besides the ones the wallet reported. A
+ * commit the web never reported stays recoverable with no deadline, so this is a generous window
+ * and not the two weeks in which the oracle settles or the release opens.
+ */
+const UNSETTLED_LOOKBACK = 12n;
 
 /** A Strava reading is reused for this long, so refreshing the page does not spend the limit. */
 const KM_CACHE_MS = 10 * 60_000;
@@ -250,7 +262,10 @@ export function createApp(deps: ApiDeps): Hono {
       weekId,
     };
     const now = deps.now();
-    const cached = await findStravaRead(deps.db, key);
+    const found = await findStravaRead(deps.db, key);
+    // Strava data is never kept or shown past 7 days (POL 6.2), even when Strava is down.
+    const cached =
+      found !== null && now.getTime() - found.readAt.getTime() < STRAVA_RETENTION_MS ? found : null;
     const fromCache =
       cached === null ? null : { totalM: Number(cached.totalM), readAt: cached.readAt };
     if (cached !== null && now.getTime() - cached.readAt.getTime() < KM_CACHE_MS) return fromCache;
@@ -320,8 +335,11 @@ export function createApp(deps: ApiDeps): Hono {
     const code: AgentHabitErrorCode = isAgentHabitError(error) ? error.code : "DatabaseError";
     const status = STATUS[code] ?? 500;
     // Method, path and code only: no query string, body, header or message that could carry a
-    // token or Strava data.
-    deps.log(`${c.req.method} ${c.req.path} ${status} ${code}`);
+    // token or Strava data. An error that is not one of ours is logged as such, not as a database
+    // problem, which is what the web is told.
+    deps.log(
+      `${c.req.method} ${c.req.path} ${status} ${isAgentHabitError(error) ? code : "Unexpected"}`,
+    );
     return c.json({ error: code }, status);
   });
 
@@ -352,23 +370,24 @@ export function createApp(deps: ApiDeps): Hono {
     const backend = backendFor(owner.chain);
     const current = await backend.currentWeek();
 
-    // Earlier weeks that may still hold money: the two before this one, and any the wallet
-    // reported. The chain says which are still `Active`.
+    // Earlier weeks that may still hold money: the last dozen, and any the wallet reported. The
+    // chain says which are still `Active`; they are read together, then the newest come first.
     const candidates = new Set<bigint>();
-    for (const back of [1n, 2n]) if (current >= back) candidates.add(current - back);
+    for (let back = 1n; back <= UNSETTLED_LOOKBACK; back++) {
+      if (current >= back) candidates.add(current - back);
+    }
     const reported = await listMirroredWeeks(deps.db, {
       chain: owner.chain,
       contract: backend.instance.contract,
       user: owner.address,
     });
     for (const weekId of reported) if (weekId < current) candidates.add(weekId);
-    const unsettledWeeks: WeekView[] = [];
-    for (const weekId of [...candidates]
-      .sort((a, b) => (a < b ? 1 : -1))
-      .slice(0, UNSETTLED_LOOKBACK)) {
-      const view = await weekView(backend, owner, weekId, false);
-      if (view.position?.state === "Active") unsettledWeeks.push(view);
-    }
+    const earlier = await Promise.all(
+      [...candidates].map((weekId) => weekView(backend, owner, weekId, false)),
+    );
+    const unsettledWeeks = earlier
+      .filter((view) => view.position?.state === "Active")
+      .sort((a, b) => (BigInt(a.weekId) < BigInt(b.weekId) ? 1 : -1));
 
     const response: WeeksResponse = {
       now: deps.now().toISOString(),
@@ -420,6 +439,14 @@ export function createApp(deps: ApiDeps): Hono {
     const owner = await session(c);
     const backend = backendFor(owner.chain);
     const input = await body(c, SubmitTxRequestSchema);
+    // The same rule as when the commit was built (A-23): between building and sending, the
+    // Strava connection may have been revoked, and a commit with no athlete locks money uncounted.
+    const fn = backend.relayedFunction(input.xdr, owner.address);
+    if (fn === "commit" && !(await stravaLinkOf(owner)).live) {
+      throw new AgentHabitError("InvalidRequest", "Connect Strava before committing", {
+        details: { fields: ["link"] },
+      });
+    }
     return c.json(await backend.submit(input.xdr, owner.address));
   });
 
