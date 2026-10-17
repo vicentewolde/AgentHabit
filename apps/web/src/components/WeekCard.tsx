@@ -1,12 +1,11 @@
 import type { InstanceInfo, WeekView } from "@agenthabit/core";
 import { formatKm, formatUsdc } from "../amounts.js";
-import { canRelease, describeDaysLeft, formatMoment } from "../time.js";
-import { ReleaseBox } from "./ReleaseBox.js";
+import { describeDaysLeft, formatMoment } from "../time.js";
 import { ExplorerLink, Notice } from "./ui.js";
 
 type Position = NonNullable<WeekView["position"]>;
 
-const STATE_TEXT: Record<Position["state"], string> = {
+export const STATE_TEXT: Record<Position["state"], string> = {
   Active: "Activo: tu depósito está bloqueado hasta que se cierre la semana.",
   Returned: "Cumpliste la meta: tu depósito volvió a tu billetera.",
   Forfeited:
@@ -38,13 +37,25 @@ function Progress(props: { readonly totalM: number; readonly goalM: number }) {
   );
 }
 
+/** The commit is on-chain but the API has no hash for it: said calmly, with what is happening. */
+export function UnregisteredNotice() {
+  return (
+    <Notice tone="warning">
+      Tu compromiso ya está en la cadena, pero todavía no quedó registrado en AgentHabit. Lo
+      seguimos intentando cada vez que abres o actualizas esta página; mantén esta pestaña abierta o
+      vuelve en un rato. Hasta que se registre, tu semana no se puede liquidar.
+    </Notice>
+  );
+}
+
 /** One week as its owner sees it: the position, the km, the days left and the way out. */
 export function WeekCard(props: {
   readonly week: WeekView;
   readonly instance: InstanceInfo;
   readonly nowMs: number;
   readonly kind: "current" | "next";
-  readonly onChanged: () => void;
+  /** From `GET /me`: decides which hint to give when there is no reading yet. */
+  readonly stravaConnected: boolean;
 }) {
   const { week, instance } = props;
   const position = week.position;
@@ -72,8 +83,9 @@ export function WeekCard(props: {
             <>
               {week.totalM === null ? (
                 <p className="text-slate-700">
-                  Todavía no tenemos una lectura de tus carreras. Conecta Strava para ver tus
-                  kilómetros.
+                  {props.stravaConnected
+                    ? "Todavía no tenemos una lectura de tus carreras de esta semana."
+                    : "Conecta Strava para ver tus kilómetros."}
                 </p>
               ) : (
                 <>
@@ -89,21 +101,11 @@ export function WeekCard(props: {
             </>
           )}
           {position.commitTxHash === null ? (
-            position.state === "Active" && (
-              <Notice tone="warning">
-                Tu compromiso ya está en la cadena, pero todavía no quedó registrado en AgentHabit.
-                Lo seguimos intentando cada vez que abres o actualizas esta página; mantén esta
-                pestaña abierta o vuelve en un rato. Hasta que se registre, tu semana no se puede
-                liquidar.
-              </Notice>
-            )
+            position.state === "Active" && <UnregisteredNotice />
           ) : (
             <p>
               <ExplorerLink template={instance.explorerTxUrl} hash={position.commitTxHash} />
             </p>
-          )}
-          {canRelease(week, props.nowMs) && (
-            <ReleaseBox weekId={week.weekId} onDone={props.onChanged} instance={instance} />
           )}
         </>
       )}

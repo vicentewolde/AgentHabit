@@ -4,6 +4,7 @@ import { messageFor } from "../api/messages.js";
 import { useApp } from "../app-context.js";
 import { CommitForm } from "../components/CommitForm.js";
 import { StravaCard } from "../components/StravaCard.js";
+import { UnsettledWeek } from "../components/UnsettledWeek.js";
 import { Button, Card, Loading, Notice } from "../components/ui.js";
 import { WeekCard } from "../components/WeekCard.js";
 import { reconcilePendingCommit } from "../flows.js";
@@ -79,9 +80,11 @@ export function Dashboard() {
   // While a position is on-chain but unreported, ask again: the pending hash is retried on load.
   const unreported =
     state.kind === "ready" &&
-    [state.data.weeks.currentWeek, state.data.weeks.nextWeek].some(
-      (week) => week.position?.state === "Active" && week.position.commitTxHash === null,
-    );
+    [
+      state.data.weeks.currentWeek,
+      state.data.weeks.nextWeek,
+      ...state.data.weeks.unsettledWeeks,
+    ].some((week) => week.position?.state === "Active" && week.position.commitTxHash === null);
   useEffect(() => {
     if (!unreported) return;
     const timer = window.setInterval(() => void load(true), RETRY_MS);
@@ -118,9 +121,23 @@ export function Dashboard() {
           instance={instance}
           nowMs={nowMs}
           kind="current"
-          onChanged={reload}
+          stravaConnected={me.stravaConnected}
         />
       </Card>
+      {weeks.unsettledWeeks.length > 0 && (
+        <Card title="Semanas anteriores sin liquidar" headingId="h-unsettled">
+          <ul className="space-y-4">
+            {weeks.unsettledWeeks.map((week) => (
+              <li
+                key={week.weekId}
+                className="space-y-3 border-b border-slate-200 pb-4 last:border-0"
+              >
+                <UnsettledWeek week={week} instance={instance} nowMs={nowMs} onChanged={reload} />
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       <Card title="La semana que viene" headingId="h-next">
         {(weeks.nextWeek.position === null || committed) && (
           <CommitForm
@@ -140,7 +157,7 @@ export function Dashboard() {
             instance={instance}
             nowMs={nowMs}
             kind="next"
-            onChanged={reload}
+            stravaConnected={me.stravaConnected}
           />
         )}
       </Card>
