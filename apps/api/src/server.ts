@@ -4,7 +4,11 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { normalizeEvmAddress, verifyEvmLinkSignature } from "@agenthabit/chain-avalanche";
-import { normalizeStellarAddress, verifyStellarLinkSignature } from "@agenthabit/chain-stellar";
+import {
+  normalizeStellarAddress,
+  normalizeStellarContract,
+  verifyStellarLinkSignature,
+} from "@agenthabit/chain-stellar";
 import { parseApiEnv } from "@agenthabit/config";
 import { AgentHabitError } from "@agenthabit/core";
 import { createDatabase, parseTokenKey } from "@agenthabit/db";
@@ -37,10 +41,12 @@ const app = createApp({
   chains: {
     stellar: {
       normalizeAddress: normalizeStellarAddress,
+      normalizeContract: normalizeStellarContract,
       verifyLinkSignature: verifyStellarLinkSignature,
     },
     avalanche: {
       normalizeAddress: normalizeEvmAddress,
+      normalizeContract: normalizeEvmAddress,
       verifyLinkSignature: verifyEvmLinkSignature,
     },
   },

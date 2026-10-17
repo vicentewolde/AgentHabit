@@ -16,6 +16,7 @@ import {
   createSession,
   type Database,
   decryptToken,
+  deleteWalletLink,
   encryptToken,
   findSession,
   findStravaConnection,
@@ -28,6 +29,7 @@ import {
 } from "@agenthabit/db";
 import type { Connection } from "@agenthabit/strava";
 import { type Context, Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 
 /**
@@ -39,6 +41,8 @@ import { z } from "zod";
 /** What the API needs from each chain: address normalization and link-signature checks. */
 export interface ChainSupport {
   readonly normalizeAddress: (address: string) => string | null;
+  /** A deployed contract's address in the form `knownContracts` lists it, or null. */
+  readonly normalizeContract: (contract: string) => string | null;
   readonly verifyLinkSignature: (signed: SignedLinkMessage) => boolean | Promise<boolean>;
 }
 
@@ -73,6 +77,7 @@ export interface ApiDeps {
   /** `chain:contract` of every deployed instance the mirror accepts (deployments/*.json, T6). */
   readonly knownContracts: ReadonlySet<string>;
   readonly webOrigin: string;
+  /** The web page Strava returns to (A-19); the web forwards the result to `/strava/callback`. */
   readonly stravaRedirectUri: string;
   readonly now: () => Date;
   readonly randomBytes: (size: number) => Buffer;
@@ -107,10 +112,11 @@ const PositionBody = z.object({
   weekId: z.string().regex(/^\d{1,20}$/),
   txHash: z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/),
 });
-const CallbackQuery = z.union([
-  z.object({ code: z.string().min(1), scope: z.string(), state: z.string().min(1) }),
-  z.object({ error: z.string(), state: z.string().optional() }),
-]);
+const CallbackBody = z.object({
+  code: z.string().min(1).max(200),
+  scope: z.string().max(200),
+  state: z.string().regex(/^[0-9a-f]{32}$/),
+});
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -130,6 +136,16 @@ export function createApp(deps: ApiDeps): Hono {
   const app = new Hono();
 
   const webHost = new URL(deps.webOrigin).host;
+
+  // Every body here is a few hundred bytes; anything bigger is refused before it is parsed.
+  app.use(
+    bodyLimit({
+      maxSize: 8 * 1024,
+      onError: () => {
+        throw new AgentHabitError("InvalidRequest", "The request body is too large");
+      },
+    }),
+  );
 
   async function session(c: Context): Promise<{ chain: ChainId; address: string }> {
     const header = c.req.header("authorization") ?? "";
@@ -225,47 +241,52 @@ export function createApp(deps: ApiDeps): Hono {
   });
 
   /**
-   * Strava's redirect. The state ties it to the wallet that started it; the scope must include
-   * `activity:read_all`. On success the tokens are stored encrypted and the wallet is linked to
-   * the athlete. Either way the browser returns to the web, with no code or token in the URL.
+   * Strava's redirect lands on the web, which hands `code`, `scope` and `state` over with its
+   * session (A-19). The state must have been issued to this very session's wallet: a link a third
+   * party started, completed in the victim's browser, is refused, so nobody can tie their wallet to
+   * someone else's Strava account (RFC 6749 §10.12). The scope must include `activity:read_all`.
+   * On success the tokens are stored encrypted and the wallet is linked to the athlete.
    */
-  app.get(new URL(deps.stravaRedirectUri).pathname, async (c) => {
-    const back = (result: string) => c.redirect(`${deps.webOrigin}/?strava=${result}`, 302);
-    const query = CallbackQuery.safeParse(c.req.query());
-    if (!query.success || !("code" in query.data)) return back("denied");
-    const owner = await consumeOAuthState(deps.db, query.data.state, deps.now());
-    if (owner === null) return back("expired");
-    try {
-      const connection = await deps.strava.exchangeCode(query.data.code, query.data.scope);
-      const now = deps.now();
-      await saveStravaConnection(
-        deps.db,
-        {
-          athleteId: connection.athleteId,
-          scope: connection.scope,
-          accessTokenEnc: encryptToken(connection.accessToken, deps.tokenKey),
-          refreshTokenEnc: encryptToken(connection.refreshToken, deps.tokenKey),
-          expiresAt: connection.expiresAt,
-        },
-        now,
-      );
-      await upsertWalletLink(deps.db, { ...owner, athleteId: connection.athleteId }, now);
-      return back("connected");
-    } catch (error) {
-      const code = isAgentHabitError(error) ? error.code : "DatabaseError";
-      deps.log(`GET ${c.req.path} 302 ${code}`);
-      return back(code === "StravaScopeMissing" ? "scope" : "error");
+  app.post("/strava/callback", async (c) => {
+    const owner = await session(c);
+    const input = await body(c, CallbackBody);
+    const issuedTo = await consumeOAuthState(deps.db, input.state, deps.now());
+    if (issuedTo === null) {
+      throw new AgentHabitError("LinkRejected", "The Strava state is unknown, used or expired");
     }
+    if (issuedTo.chain !== owner.chain || issuedTo.address !== owner.address) {
+      throw new AgentHabitError("LinkRejected", "The Strava state belongs to another wallet");
+    }
+    const connection = await deps.strava.exchangeCode(input.code, input.scope);
+    const now = deps.now();
+    await saveStravaConnection(
+      deps.db,
+      {
+        athleteId: connection.athleteId,
+        scope: connection.scope,
+        accessTokenEnc: encryptToken(connection.accessToken, deps.tokenKey),
+        refreshTokenEnc: encryptToken(connection.refreshToken, deps.tokenKey),
+        expiresAt: connection.expiresAt,
+      },
+      now,
+    );
+    await upsertWalletLink(deps.db, { ...owner, athleteId: connection.athleteId }, now);
+    return c.json({ connected: true });
   });
 
   /**
-   * The web's "disconnect Strava". It counts as a revocation (A-10): the tokens and the cached
-   * readings are deleted even if Strava cannot be reached to revoke them there.
+   * The web's "disconnect Strava" for this wallet. Only this wallet's link goes. When no other
+   * wallet still uses the athlete, the access is revoked at Strava and locally (A-10): the tokens
+   * and the cached readings are deleted even if Strava cannot be reached. A wallet can never
+   * revoke an athlete another wallet still relies on.
    */
   app.post("/strava/disconnect", async (c) => {
     const { chain, address } = await session(c);
     const link = await findWalletLink(deps.db, chain, address);
     if (link === null) return c.json({ disconnected: false });
+    const remaining = await deleteWalletLink(deps.db, chain, address, link.athleteId);
+    if (remaining > 0) return c.json({ disconnected: true });
+
     const connection = await findStravaConnection(deps.db, link.athleteId);
     if (connection?.accessTokenEnc) {
       try {
@@ -291,7 +312,8 @@ export function createApp(deps: ApiDeps): Hono {
         details: { fields: ["chain"] },
       });
     }
-    if (!deps.knownContracts.has(`${input.chain}:${input.contract}`)) {
+    const contract = deps.chains[input.chain].normalizeContract(input.contract);
+    if (contract === null || !deps.knownContracts.has(`${input.chain}:${contract}`)) {
       throw new AgentHabitError("InvalidRequest", "Not a deployed AgentHabit contract", {
         details: { fields: ["contract"] },
       });
@@ -305,7 +327,7 @@ export function createApp(deps: ApiDeps): Hono {
     const weekId = BigInt(input.weekId);
     const onChain = await deps.commits.readCommit({
       chain: input.chain,
-      contract: input.contract,
+      contract,
       user: owner.address,
       weekId,
       txHash: input.txHash,
@@ -317,7 +339,7 @@ export function createApp(deps: ApiDeps): Hono {
       deps.db,
       {
         chain: input.chain,
-        contract: input.contract,
+        contract,
         user: owner.address,
         weekId,
         athleteId: link.athleteId,

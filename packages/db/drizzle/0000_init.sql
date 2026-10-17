@@ -11,12 +11,21 @@ CREATE TABLE "link_challenges" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "oauth_states" (
+	"state" text PRIMARY KEY NOT NULL,
+	"chain" "chain" NOT NULL,
+	"address" text NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"used_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "positions" (
 	"chain" "chain" NOT NULL,
 	"contract" text NOT NULL,
 	"user" text NOT NULL,
 	"week_id" bigint NOT NULL,
-	"athlete_id" bigint NOT NULL,
+	"athlete_id" bigint,
 	"amount" text NOT NULL,
 	"goal_m" bigint NOT NULL,
 	"commit_tx_hash" text NOT NULL,
@@ -42,7 +51,7 @@ CREATE TABLE "settlements" (
 	"tx_hash" text,
 	"reason" text NOT NULL,
 	"settled_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "settlements_chain_contract_user_week_id_pk" PRIMARY KEY("chain","contract","user","week_id")
+	CONSTRAINT "settlements_chain_contract_user_week_id_mode_pk" PRIMARY KEY("chain","contract","user","week_id","mode")
 );
 --> statement-breakpoint
 CREATE TABLE "strava_connections" (

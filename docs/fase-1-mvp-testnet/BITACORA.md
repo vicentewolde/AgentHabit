@@ -132,6 +132,33 @@ de Strava no dice:
   No bloquea la Fase 1; quedó para leer y preguntar a Strava.
 
 **Decisiones nuevas.** `A-15` (PGlite en los tests), `A-16` (firma del vínculo), `A-17` (reglas del cliente de
-Strava) y `A-18` (callback de OAuth).
+Strava) y `A-18` (callback de OAuth, superada por `A-19`). Después de `/revisar`: `A-19`, `A-20` y `A-21`.
+
+**Revisión (`/revisar`).** El `revisor` encontró dos bloqueantes, los dos caminos por los que una semana terminaría
+`Forfeited` sin que el dueño hubiera fallado. Se corrigieron en un commit `fix` sobre la misma rama.
+- **Un tercero podía apropiarse del vínculo con Strava y después revocarlo.**
+  1. El tercero iniciaba la conexión con su wallet y le mandaba el enlace de Strava a la víctima.
+  2. La víctima autorizaba, y la wallet del tercero quedaba ligada a sus carreras.
+  3. El tercero desconectaba, y eso dejaba sin km las semanas de la víctima.
+
+  Ahora la vuelta de Strava pasa por la web y se completa solo en la sesión que la empezó. Además, desconectar una
+  wallet ya no revoca un atleta que otra wallet sigue usando (`A-19`).
+- **Dos renovaciones de token al mismo tiempo podían parecer una revocación.** La que perdía la carrera recibía
+  "token inválido" y borraba el token bueno. Ahora solo revoca si el token guardado sigue siendo el que usó; si no,
+  usa el del ganador.
+
+También se corrigieron cuatro importantes:
+- una conexión inexistente ya no cuenta como revocación;
+- el registro de liquidaciones lleva el modo en la clave, para que un ensayo y la liquidación real convivan;
+- el id del atleta se borra cuando ya no hace falta (`A-20`);
+- D4 y D5 de `strava.md` quedaron como decisión (`A-21`).
+
+Y sugerencias:
+- un límite al tamaño de los pedidos;
+- la dirección del contrato normalizada por cadena;
+- más secretos revisados en los logs;
+- la purga de desafíos y sesiones vencidos.
+
+El importante que queda abierto es la prueba con la cuenta real, del lado del usuario.
 
 **Evidencia.** [`evidencia/T5.md`](evidencia/T5.md).

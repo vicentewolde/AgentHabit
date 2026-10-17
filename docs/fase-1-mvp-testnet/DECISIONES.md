@@ -13,7 +13,7 @@ Estados: `Vigente` · `Superada` · `Pendiente`
 - **`A-8` a `A-11`:** las decidió el usuario el 16-oct, en las preguntas de T3.
 - **`A-12` a `A-14`:** las tomó Claude Code en T4, donde el spec dejaba la cifra o el detalle a esa tarea. Se
   revisan con `/revisar` antes del merge.
-- **`A-15` a `A-18`:** las tomó Claude Code en T5, con lo verificado por `integraciones` en
+- **`A-15` a `A-21`:** las tomó Claude Code en T5 (`A-19` a `A-21` tras `/revisar`), con lo verificado por `integraciones` en
   `docs/integraciones/strava.md` y `firmas.md`. El usuario pidió seguir sin pedirle aprobación; se revisan con
   `/revisar` antes del merge.
 - Las referencias a tareas usan la numeración agrupada del 16-oct (T4 a T9; ver el registro de cambios del spec).
@@ -345,6 +345,11 @@ prueba 8.5 de `strava.md`.
 o el tiempo), la lectura queda incompleta y no sirve para liquidar. Si nunca se completa, la posición vuelve a su
 dueño por `release_if_stale`. Que no haya `device_name` ni `upload_id` sí es una respuesta: esa carrera no cuenta.
 
+**Una renovación que pierde una carrera no revoca.** Si otro proceso ya rotó el refresh token, Strava rechaza el
+viejo como inválido. Por eso la revocación se marca solo si el refresh token guardado sigue siendo el que se usó. Si
+no, se relee la fila y se usa el token del ganador (hallazgo de `/revisar`). Una conexión que no existe o que no
+tiene tokens es un error de base, no una revocación.
+
 **Los tokens** solo viajan en la cabecera `Authorization` o en el cuerpo, nunca en la URL ni en un error.
 
 **Motivo.** El error del verificador nunca le cuesta al usuario (spec 4.6). Una regla de revocación amplia
@@ -355,7 +360,7 @@ quedar fuera sin que nadie lo note, y el usuario perdería su depósito.
 
 ---
 
-### A-18 · El callback de OAuth lo recibe la API, con el `state` en la base · `Vigente`
+### A-18 · El callback de OAuth lo recibe la API, con el `state` en la base · `Superada` por `A-19`
 **Fecha:** 2026-10-17 · **Tarea:** T5
 
 Strava redirige a `STRAVA_REDIRECT_URI`, en la API (`/auth/strava/callback`), sin sesión.
@@ -370,3 +375,70 @@ a quien empezó la conexión y además protege contra CSRF.
 
 **Alternativa descartada:** que la web reciba el código y lo reenvíe a la API. Pone el código en una página más y
 suma un paso sin ganar nada.
+
+---
+
+### A-19 · El callback de OAuth llega a la web, que lo reenvía con su sesión · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T5 (`/revisar`) · Reemplaza a `A-18`
+
+Strava redirige a una página de la web (`STRAVA_REDIRECT_URI`, por ejemplo `http://localhost:5173/strava/callback`).
+- La web reenvía `code`, `scope` y `state` a `POST /strava/callback`, con su sesión `Bearer`.
+- La API exige que el `state` haya sido emitido para la wallet de esa misma sesión. Si no, responde `LinkRejected`.
+
+**Desconectar es por wallet.** `POST /strava/disconnect` borra solo el vínculo de esa wallet. Revoca al atleta en
+Strava y en la base (`A-10`) solo cuando ninguna otra wallet lo sigue usando.
+
+**Motivo.** Con `A-18` el `state` ligaba el callback a la wallet que lo pidió, pero no al navegador que volvía de
+Strava (RFC 6749 §10.12). El ataque era así:
+1. Un tercero inicia una conexión con su propia wallet.
+2. Le manda el enlace de Strava a la víctima. Con `approval_prompt=auto`, la víctima puede autorizar sin ver
+   ninguna pantalla.
+3. La wallet del tercero queda ligada al atleta de la víctima.
+4. El tercero desconecta, y eso revoca a la víctima: sus semanas activas quedarían en `Forfeited`.
+
+Ahora el callback solo se completa dentro de la sesión que lo empezó, y una wallet no puede revocar un atleta que
+otra todavía usa. Lo encontró el `revisor` en `/revisar`, y hay test.
+
+**Alternativa descartada:** atar el `state` al navegador con una cookie `HttpOnly`. La web y la API corren en
+orígenes distintos (5173 y 3000), y una cookie entre orígenes complica más de lo que protege, cuando la web ya
+tiene una sesión.
+
+---
+
+### A-20 · Qué se guarda del atleta, y por cuánto tiempo · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T5 (`/revisar`)
+
+El id de atleta se trata como Strava Data: es una decisión conservadora. Por eso:
+- **Al revocar** se borran los tokens y todos los vínculos de wallet a ese atleta. La fila de la conexión queda, con
+  `revokedAt`, para que la liquidación aplique `A-10`.
+- **La purga diaria** (`purgeExpiredData`, que corre el Cron de T6) además:
+  - anula el `athlete_id` de cada posición liquidada en `live`;
+  - borra las conexiones revocadas hace 30 días o más (POL 7.4);
+  - borra los desafíos, estados de OAuth y sesiones vencidos.
+- **El registro de liquidaciones** lleva `mode` en la clave. Un `dry-run` y después la liquidación `live` de la
+  misma posición son dos registros. La purga solo cuenta las `live`.
+
+**Motivo.**
+- POL 6.4 limita la retención al propósito, y POL 7.4 pide borrar en 30 días tras una revocación.
+- Sin `mode` en la clave, un `live` posterior a un `dry-run` chocaba con la clave primaria después de haber enviado
+  la transacción.
+
+**Alternativa descartada:** borrar la conexión apenas se revoca. La liquidación de las semanas activas necesita
+saber que hubo revocación (`A-10`). Sin la fila, la vería como un error pasajero y devolvería el depósito.
+
+---
+
+### A-21 · Cómo se prueba con la cuenta real y cómo se refleja un borrado · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T5 · Son D4 y D5 de `docs/integraciones/strava.md`
+
+- **Pruebas con la cuenta real** (D4). El usuario las corre en su máquina. Al chat trae solo conclusiones sobre la API
+  (formatos, códigos, si algo existe), nunca distancias, fechas, conteos ni ids. POL 5.3 cubre también los datos
+  derivados o agregados.
+- **Actividades borradas** (D5, POL 6.3). Sin webhooks, un borrado se refleja releyendo:
+  - la liquidación siempre relee la semana completa;
+  - la web nunca muestra actividades guardadas sin releerlas (T7).
+
+**Motivo.** Es la forma de cumplir POL 5.3 y 6.3 sin un callback público, que no existe en la Fase 1.
+
+**Alternativa descartada:** webhooks de Strava. Exigen un callback público, y la Fase 1 corre en `localhost`
+(`A-6`).

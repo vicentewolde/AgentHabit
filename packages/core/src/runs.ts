@@ -7,7 +7,10 @@ import { weekEnd } from "./week.js";
  * knows about HTTP. Every field but `id` is optional, as in the API (spec 4.8).
  */
 export interface ActivitySummary {
-  /** Strava's int64 id, kept as a decimal string: it can exceed 2^53. */
+  /**
+   * Strava's id as a decimal string. Strava documents it as int64; the client accepts only safe
+   * integers (below 2^53) and treats anything larger as a malformed page, which fails safe.
+   */
   readonly id: string;
   readonly sportType?: string;
   /** Metres, fractional. */

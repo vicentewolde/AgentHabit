@@ -34,31 +34,45 @@ export async function freshAccessToken(
   athleteId: bigint,
 ): Promise<string> {
   const connection = await findStravaConnection(deps.db, athleteId);
+  if (connection === null) {
+    // Not a revocation: an unknown athlete only skips the position (spec 4.6).
+    throw new AgentHabitError("DatabaseError", "No Strava connection for this athlete");
+  }
+  if (connection.revokedAt !== null) {
+    throw new AgentHabitError("StravaRevoked", "The athlete revoked AgentHabit's access");
+  }
   if (
-    connection === null ||
-    connection.revokedAt !== null ||
     connection.accessTokenEnc === null ||
     connection.refreshTokenEnc === null ||
     connection.expiresAt === null
   ) {
-    throw new AgentHabitError("StravaRevoked", "The athlete has no active Strava connection");
+    throw new AgentHabitError("DatabaseError", "A live Strava connection has no tokens");
   }
   if (connection.expiresAt.getTime() - REFRESH_MARGIN_MS > deps.now().getTime()) {
     return decryptToken(connection.accessTokenEnc, deps.tokenKey);
   }
 
+  const previousRefreshTokenEnc = connection.refreshTokenEnc;
   let next: Tokens;
   try {
-    next = await deps.strava.refresh(decryptToken(connection.refreshTokenEnc, deps.tokenKey));
+    next = await deps.strava.refresh(decryptToken(previousRefreshTokenEnc, deps.tokenKey));
   } catch (error) {
-    if (hasErrorCode(error, "StravaRevoked"))
-      await markStravaRevoked(deps.db, athleteId, deps.now());
-    throw error;
+    if (!hasErrorCode(error, "StravaRevoked")) throw error;
+    // Revoke only if our refresh token is still the stored one. Otherwise a concurrent renewal
+    // rotated it, Strava refused ours as stale, and the winner's token is the one to use.
+    const revoked = await markStravaRevoked(
+      deps.db,
+      athleteId,
+      deps.now(),
+      previousRefreshTokenEnc,
+    );
+    if (revoked) throw error;
+    return currentAccessToken(deps, athleteId);
   }
   const stored = await rotateStravaTokens(
     deps.db,
     athleteId,
-    connection.refreshTokenEnc,
+    previousRefreshTokenEnc,
     {
       accessTokenEnc: encryptToken(next.accessToken, deps.tokenKey),
       refreshTokenEnc: encryptToken(next.refreshToken, deps.tokenKey),
@@ -66,13 +80,20 @@ export async function freshAccessToken(
     },
     deps.now(),
   );
-  if (!stored) {
-    // Another renewal won the race and stored its own pair: use that one.
-    const winner = await findStravaConnection(deps.db, athleteId);
-    if (winner?.accessTokenEnc == null) {
+  // Another renewal won the race and stored its own pair: use that one.
+  return stored ? next.accessToken : currentAccessToken(deps, athleteId);
+}
+
+async function currentAccessToken(
+  deps: { readonly db: Database; readonly tokenKey: TokenKey },
+  athleteId: bigint,
+): Promise<string> {
+  const winner = await findStravaConnection(deps.db, athleteId);
+  if (winner === null || winner.accessTokenEnc === null) {
+    if (winner?.revokedAt != null) {
       throw new AgentHabitError("StravaRevoked", "The connection was revoked during the renewal");
     }
-    return decryptToken(winner.accessTokenEnc, deps.tokenKey);
+    throw new AgentHabitError("DatabaseError", "The connection vanished during the renewal");
   }
-  return next.accessToken;
+  return decryptToken(winner.accessTokenEnc, deps.tokenKey);
 }

@@ -11,7 +11,8 @@ import {
   findStravaRead,
   markStravaRevoked,
   type PositionKey,
-  purgeExpiredStravaData,
+  purgeExpiredData,
+  REVOKED_RETENTION_MS,
   recordSettlement,
   registerPosition,
   rotateStravaTokens,
@@ -211,8 +212,8 @@ describe("the position mirror", () => {
   });
 });
 
-describe("purgeExpiredStravaData (POL 6.2)", () => {
-  it("deletes readings older than 7 days and keeps the fresh ones", async () => {
+describe("purgeExpiredData", () => {
+  it("deletes readings older than 7 days and keeps the fresh ones (POL 6.2)", async () => {
     await saveStravaRead(db, {
       ...key({ weekId: 1n }),
       totalM: 1n,
@@ -226,22 +227,82 @@ describe("purgeExpiredStravaData (POL 6.2)", () => {
       readAt: later(MINUTE),
     });
 
-    const purged = await purgeExpiredStravaData(db, later(STRAVA_RETENTION_MS));
+    const report = await purgeExpiredData(db, later(STRAVA_RETENTION_MS));
 
-    expect(purged).toBe(1);
+    expect(report.stravaReads).toBe(1);
     expect(await findStravaRead(db, key({ weekId: 1n }))).toBeNull();
     expect(await findStravaRead(db, key({ weekId: 2n }))).not.toBeNull();
   });
 
-  it("deletes a reading as soon as its position is settled", async () => {
+  it("deletes a reading and clears the frozen athlete once the position is settled live", async () => {
+    await registerPosition(
+      db,
+      { ...key(), athleteId: 42n, amount: 200_000_000n, goalM: 10_000n, commitTxHash: "tx" },
+      NOW,
+    );
     await saveStravaRead(db, { ...key(), totalM: 12_000n, activityIds: ["1", "2"], readAt: NOW });
+    const settlement = { ...key(), outcome: "met" as const, txHash: null, reason: "goal met" };
+
+    // A dry-run first: nothing is settled yet, so nothing goes.
+    await recordSettlement(db, { ...settlement, mode: "dry-run" }, later(MINUTE));
+    expect((await purgeExpiredData(db, later(2 * MINUTE))).stravaReads).toBe(0);
+
+    // Then the live settlement of the same position: a second record, not a clash.
     await recordSettlement(
       db,
-      { ...key(), outcome: "met", mode: "dry-run", txHash: null, reason: "goal met" },
-      later(MINUTE),
+      { ...settlement, mode: "live", txHash: "tx-live" },
+      later(3 * MINUTE),
     );
+    const report = await purgeExpiredData(db, later(4 * MINUTE));
 
-    expect(await purgeExpiredStravaData(db, later(2 * MINUTE))).toBe(1);
+    expect(report).toMatchObject({ stravaReads: 1, athleteIdsCleared: 1 });
     expect(await findStravaRead(db, key())).toBeNull();
+    expect((await findMirroredPosition(db, key()))?.athleteId).toBeNull();
+  });
+
+  it("deletes a revoked connection after 30 days, and keeps it before (POL 7.4)", async () => {
+    await saveStravaConnection(
+      db,
+      {
+        athleteId: 42n,
+        scope: "read,activity:read_all",
+        accessTokenEnc: "a",
+        refreshTokenEnc: "r",
+        expiresAt: NOW,
+      },
+      NOW,
+    );
+    await markStravaRevoked(db, 42n, NOW);
+
+    expect(
+      (await purgeExpiredData(db, later(REVOKED_RETENTION_MS - MINUTE))).revokedConnections,
+    ).toBe(0);
+    expect((await purgeExpiredData(db, later(REVOKED_RETENTION_MS))).revokedConnections).toBe(1);
+    expect(await findStravaConnection(db, 42n)).toBeNull();
+  });
+
+  it("deletes expired challenges, OAuth states and sessions", async () => {
+    await createChallenge(db, {
+      nonce: "n",
+      chain: "stellar",
+      address: "G",
+      message: "m",
+      expiresAt: later(MINUTE),
+    });
+    await createSession(db, {
+      tokenHash: "h",
+      chain: "stellar",
+      address: "G",
+      expiresAt: later(MINUTE),
+    });
+
+    expect(await purgeExpiredData(db, NOW)).toMatchObject({
+      expiredChallenges: 0,
+      expiredSessions: 0,
+    });
+    expect(await purgeExpiredData(db, later(MINUTE))).toMatchObject({
+      expiredChallenges: 1,
+      expiredSessions: 1,
+    });
   });
 });

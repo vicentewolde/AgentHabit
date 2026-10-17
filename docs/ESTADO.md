@@ -60,6 +60,11 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
     - `knownContracts` desde `deployments/*.json`;
     - el liquidador usando `freshAccessToken` y `readWeek`, y la purga diaria;
     - un solo proceso renueva tokens (POL 5.16).
+  - **Para T7:** la página `/strava/callback` de la web reenvía `code`, `scope` y `state` a `POST /strava/callback`
+    con la sesión (`A-19`), y la API necesita CORS para el origen de la web.
+  - **Para T8:** un límite de pedidos por IP en `/link/challenge` antes de publicar.
+  - **T5 no se marca ✅** hasta que corras las pruebas con tu cuenta real (8.1 a 8.8 de `strava.md`), o hasta que
+    decidas cerrarla sin ellas.
 - **T4:** la tabla de casos se regenera con `pnpm run cases:gen`; `pnpm check` falla si `contracts/fixtures/cases.json`
   quedó desactualizado. Los errores del contrato se numeran desde 101 (`A-12`).
 - **Deuda para T6, de la revisión de T4:**

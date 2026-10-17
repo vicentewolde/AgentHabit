@@ -1,7 +1,11 @@
 import { randomBytes } from "node:crypto";
 
 import { normalizeEvmAddress, verifyEvmLinkSignature } from "@agenthabit/chain-avalanche";
-import { normalizeStellarAddress, verifyStellarLinkSignature } from "@agenthabit/chain-stellar";
+import {
+  normalizeStellarAddress,
+  normalizeStellarContract,
+  verifyStellarLinkSignature,
+} from "@agenthabit/chain-stellar";
 import { AgentHabitError } from "@agenthabit/core";
 import {
   type Database,
@@ -13,7 +17,7 @@ import {
 } from "@agenthabit/db";
 import { createTestDatabase } from "@agenthabit/db/testing";
 import type { Connection } from "@agenthabit/strava";
-import { Keypair } from "@stellar/stellar-sdk";
+import { Keypair, StrKey } from "@stellar/stellar-sdk";
 import type { Hono } from "hono";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -23,16 +27,20 @@ import { type CommitReader, createApp, type StravaGateway } from "../src/app.js"
 // Synthetic wallets, tokens and athletes only (CLAUDE.md, rule 5).
 const ACCESS = "synthetic-access-token-AAAA";
 const REFRESH = "synthetic-refresh-token-RRRR";
-const CONTRACT = "CSYNTHETICPRODUCTIONCONTRACT";
+const CONTRACT = StrKey.encodeContract(Buffer.alloc(32, 7));
+const EVM_CONTRACT = "0x5425890298aed601595a70AB815c96711a31Bc65";
 const TX = "ab".repeat(32);
 const WEB = "http://localhost:5173";
-const REDIRECT = "http://localhost:3000/auth/strava/callback";
+const REDIRECT = "http://localhost:5173/strava/callback";
 
 let db: Database;
 let close: () => Promise<void>;
 let clock: Date;
 let logs: string[];
 let revoked: string[];
+let revokeFails: boolean;
+/** Every session token, signature and OAuth state the tests handled: none may reach a log. */
+let secrets: string[];
 let commits: Map<string, { amount: bigint; goalM: bigint }>;
 let exchange: (code: string, scope: string) => Promise<Connection>;
 let app: Hono;
@@ -43,6 +51,7 @@ const strava: StravaGateway = {
     `https://www.strava.com/oauth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`,
   exchangeCode: (code, scope) => exchange(code, scope),
   revoke: async (accessToken) => {
+    if (revokeFails) throw new AgentHabitError("NetworkError", "down");
     revoked.push(accessToken);
   },
 };
@@ -57,6 +66,8 @@ beforeEach(async () => {
   clock = new Date("2026-10-19T03:00:00.000Z");
   logs = [];
   revoked = [];
+  revokeFails = false;
+  secrets = [ACCESS, REFRESH, "code-1"];
   commits = new Map();
   exchange = async (_code, scope) => ({
     accessToken: ACCESS,
@@ -72,15 +83,17 @@ beforeEach(async () => {
     chains: {
       stellar: {
         normalizeAddress: normalizeStellarAddress,
+        normalizeContract: normalizeStellarContract,
         verifyLinkSignature: verifyStellarLinkSignature,
       },
       avalanche: {
         normalizeAddress: normalizeEvmAddress,
+        normalizeContract: normalizeEvmAddress,
         verifyLinkSignature: verifyEvmLinkSignature,
       },
     },
     commits: commitReader,
-    knownContracts: new Set([`stellar:${CONTRACT}`, `avalanche:${CONTRACT}`]),
+    knownContracts: new Set([`stellar:${CONTRACT}`, `avalanche:${EVM_CONTRACT}`]),
     webOrigin: WEB,
     stravaRedirectUri: REDIRECT,
     now: () => clock,
@@ -92,7 +105,7 @@ beforeEach(async () => {
 afterEach(async () => {
   // Nothing secret ever reaches a log line (CLAUDE.md, cross-cutting criteria).
   for (const line of logs) {
-    for (const secret of [ACCESS, REFRESH, "code-1"]) expect(line).not.toContain(secret);
+    for (const secret of secrets) expect(line).not.toContain(secret);
   }
   await close();
 });
@@ -137,23 +150,31 @@ async function challenge(wallet: Wallet) {
 
 async function signIn(wallet: Wallet): Promise<string> {
   const { nonce, message } = await challenge(wallet);
-  const response = await app.request(
-    "/link/verify",
-    json({ nonce, signature: await wallet.sign(message) }),
-  );
+  const signature = await wallet.sign(message);
+  const response = await app.request("/link/verify", json({ nonce, signature }));
   expect(response.status).toBe(200);
-  return ((await response.json()) as { sessionToken: string }).sessionToken;
+  const { sessionToken } = (await response.json()) as { sessionToken: string };
+  secrets.push(sessionToken, signature);
+  return sessionToken;
 }
 
-async function connectStrava(session: string, scope = "read,activity:read_all"): Promise<string> {
+/** Starts a Strava connection for `session` and returns the state Strava would echo back. */
+async function startConnect(session: string): Promise<string> {
   const connect = await app.request("/strava/connect", { headers: bearer(session) });
+  expect(connect.status).toBe(200);
   const { url } = (await connect.json()) as { url: string };
   const state = new URL(url).searchParams.get("state") ?? "";
-  const callback = await app.request(
-    `/auth/strava/callback?code=code-1&scope=${encodeURIComponent(scope)}&state=${state}`,
-  );
-  expect(callback.status).toBe(302);
-  return callback.headers.get("location") ?? "";
+  secrets.push(state);
+  return state;
+}
+
+/** Strava's redirect lands on the web, which forwards it with its session (A-19). */
+function finishConnect(session: string, state: string, scope = "read,activity:read_all") {
+  return app.request("/strava/callback", json({ code: "code-1", scope, state }, bearer(session)));
+}
+
+async function connectStrava(session: string, scope?: string): Promise<Response> {
+  return finishConnect(session, await startConnect(session), scope);
 }
 
 describe("the signed wallet link", () => {
@@ -257,13 +278,15 @@ describe("the Strava connection", () => {
   it("needs a session", async () => {
     expect((await app.request("/strava/connect")).status).toBe(401);
     expect((await app.request("/strava/connect", { headers: bearer("forged") })).status).toBe(401);
+    const callback = json({ code: "c", scope: "s", state: "0".repeat(32) });
+    expect((await app.request("/strava/callback", callback)).status).toBe(401);
   });
 
   it("stores the tokens encrypted and links the wallet to the athlete", async () => {
     const wallet = stellarWallet();
-    const location = await connectStrava(await signIn(wallet));
+    const response = await connectStrava(await signIn(wallet));
 
-    expect(location).toBe(`${WEB}/?strava=connected`);
+    expect(response.status).toBe(200);
     expect(await findWalletLink(db, "stellar", wallet.address)).toEqual({ athleteId: 777n });
     const stored = await findStravaConnection(db, 777n);
     expect(stored?.accessTokenEnc).not.toContain(ACCESS);
@@ -276,33 +299,38 @@ describe("the Strava connection", () => {
       throw new AgentHabitError("StravaScopeMissing", "no read_all");
     };
     const wallet = evmWallet();
-    const location = await connectStrava(await signIn(wallet), "read,activity:read");
+    const response = await connectStrava(await signIn(wallet), "read,activity:read");
 
-    expect(location).toBe(`${WEB}/?strava=scope`);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "StravaScopeMissing" });
     expect(await findWalletLink(db, "avalanche", wallet.address)).toBeNull();
   });
 
-  it("refuses an unknown or reused state, and a denied authorization", async () => {
+  it("refuses an unknown or reused state", async () => {
     const session = await signIn(stellarWallet());
-    const connect = await app.request("/strava/connect", { headers: bearer(session) });
-    const state = new URL(((await connect.json()) as { url: string }).url).searchParams.get(
-      "state",
-    );
-    const callback = `/auth/strava/callback?code=code-1&scope=read,activity:read_all&state=${state}`;
+    const state = await startConnect(session);
 
-    expect((await app.request(callback)).headers.get("location")).toBe(`${WEB}/?strava=connected`);
-    expect((await app.request(callback)).headers.get("location")).toBe(`${WEB}/?strava=expired`);
-    expect(
-      (await app.request("/auth/strava/callback?code=c&scope=x&state=forged")).headers.get(
-        "location",
-      ),
-    ).toBe(`${WEB}/?strava=expired`);
-    expect(
-      (await app.request("/auth/strava/callback?error=access_denied")).headers.get("location"),
-    ).toBe(`${WEB}/?strava=denied`);
+    expect((await finishConnect(session, state)).status).toBe(200);
+    expect((await finishConnect(session, state)).status).toBe(401);
+    expect((await finishConnect(session, "f".repeat(32))).status).toBe(401);
   });
 
-  it("disconnecting revokes at Strava and deletes the tokens (A-10)", async () => {
+  it("refuses a connection a third party started, finished in the victim's session (CSRF)", async () => {
+    const attacker = await signIn(evmWallet());
+    const victimWallet = stellarWallet();
+    const victim = await signIn(victimWallet);
+    // The attacker starts a connection and sends Strava's link to the victim, who authorizes it.
+    const attackerState = await startConnect(attacker);
+
+    const response = await finishConnect(victim, attackerState);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "LinkRejected" });
+    expect(await findStravaConnection(db, 777n)).toBeNull();
+    expect(await findWalletLink(db, "stellar", victimWallet.address)).toBeNull();
+  });
+
+  it("disconnecting the only wallet revokes at Strava and deletes tokens and links (A-10)", async () => {
     const wallet = stellarWallet();
     const session = await signIn(wallet);
     await connectStrava(session);
@@ -318,21 +346,33 @@ describe("the Strava connection", () => {
       accessTokenEnc: null,
       refreshTokenEnc: null,
     });
+    expect(await findWalletLink(db, "stellar", wallet.address)).toBeNull();
+  });
+
+  it("a wallet cannot revoke an athlete another wallet still relies on", async () => {
+    const first = await signIn(stellarWallet());
+    const secondWallet = evmWallet();
+    const second = await signIn(secondWallet);
+    await connectStrava(first);
+    await connectStrava(second);
+
+    await app.request("/strava/disconnect", { method: "POST", headers: bearer(first) });
+
+    expect(revoked).toEqual([]);
+    expect((await findStravaConnection(db, 777n))?.revokedAt).toBeNull();
+    expect(await findWalletLink(db, "avalanche", secondWallet.address)).toEqual({
+      athleteId: 777n,
+    });
   });
 
   it("disconnecting still deletes the tokens when Strava cannot be reached", async () => {
-    strava.revoke = async () => {
-      throw new AgentHabitError("NetworkError", "down");
-    };
+    revokeFails = true;
     const session = await signIn(evmWallet());
     await connectStrava(session);
 
     await app.request("/strava/disconnect", { method: "POST", headers: bearer(session) });
 
     expect((await findStravaConnection(db, 777n))?.revokedAt).toEqual(clock);
-    strava.revoke = async (accessToken) => {
-      revoked.push(accessToken);
-    };
   });
 });
 
@@ -416,6 +456,33 @@ describe("the position mirror", () => {
       weekId: 3n,
     });
     expect(stored?.athleteId).toBe(777n);
+  });
+
+  it("accepts an EVM contract address in any case, normalized to its checksum form", async () => {
+    const wallet = evmWallet();
+    const session = await signIn(wallet);
+    await connectStrava(session);
+    commits.set(`avalanche:${EVM_CONTRACT}:${wallet.address}:3:${TX}`, {
+      amount: 20_000_000n,
+      goalM: 10_000n,
+    });
+
+    const response = await app.request(
+      "/positions",
+      json(report({ chain: "avalanche", contract: EVM_CONTRACT.toLowerCase() }), bearer(session)),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ contract: EVM_CONTRACT });
+  });
+
+  it("refuses a body over the size limit", async () => {
+    const session = await signIn(stellarWallet());
+    const response = await app.request(
+      "/positions",
+      json({ ...report(), padding: "x".repeat(10_000) }, bearer(session)),
+    );
+    expect(response.status).toBe(400);
   });
 
   it("refuses unknown contracts, another chain, a missing link, no session and bad bodies", async () => {

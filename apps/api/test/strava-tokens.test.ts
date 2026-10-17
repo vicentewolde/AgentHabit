@@ -6,6 +6,7 @@ import {
   decryptToken,
   encryptToken,
   findStravaConnection,
+  markStravaRevoked,
   parseTokenKey,
   saveStravaConnection,
 } from "@agenthabit/db";
@@ -153,10 +154,49 @@ describe("freshAccessToken", () => {
     ).toBe("refresh-winner");
   });
 
-  it("refuses an athlete with no active connection", async () => {
+  it("does not call a missing connection a revocation: it only skips the read", async () => {
     const error = await failure(
       freshAccessToken({ db, tokenKey, strava: refresher(rotated), now: () => NOW }, 1n),
     );
+
+    expect(hasErrorCode(error, "StravaRevoked")).toBe(false);
+    expect(hasErrorCode(error, "DatabaseError")).toBe(true);
+  });
+
+  it("does not revoke when it lost a race and Strava refused its stale refresh token", async () => {
+    await connect(new Date(NOW.getTime() - HOUR));
+    // The winner rotates and stores its pair; Strava then refuses our old refresh token.
+    const strava = refresher(async () => {
+      await saveStravaConnection(
+        db,
+        {
+          athleteId: 777n,
+          scope: "read,activity:read_all",
+          accessTokenEnc: encryptToken("access-winner", tokenKey),
+          refreshTokenEnc: encryptToken("refresh-winner", tokenKey),
+          expiresAt: new Date(NOW.getTime() + 6 * HOUR),
+        },
+        NOW,
+      );
+      throw new AgentHabitError("StravaRevoked", "invalid refresh token");
+    });
+
+    const token = await freshAccessToken({ db, tokenKey, strava, now: () => NOW }, 777n);
+
+    expect(token).toBe("access-winner");
+    const stored = await findStravaConnection(db, 777n);
+    expect(stored?.revokedAt).toBeNull();
+    expect(decryptToken(stored?.refreshTokenEnc ?? "", tokenKey)).toBe("refresh-winner");
+  });
+
+  it("reports a revoked connection as revoked", async () => {
+    await connect(new Date(NOW.getTime() + 2 * HOUR));
+    await markStravaRevoked(db, 777n, NOW);
+
+    const error = await failure(
+      freshAccessToken({ db, tokenKey, strava: refresher(rotated), now: () => NOW }, 777n),
+    );
     expect(hasErrorCode(error, "StravaRevoked")).toBe(true);
+    expect(refreshCalls).toEqual([]);
   });
 });

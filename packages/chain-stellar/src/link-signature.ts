@@ -32,6 +32,11 @@ export function verifyStellarLinkSignature(signed: SignedLinkMessage): boolean {
   }
 }
 
+/** A Soroban contract address (`C…`), or null if it is not one. */
+export function normalizeStellarContract(contract: string): string | null {
+  return StrKey.isValidContract(contract) ? contract : null;
+}
+
 /** A Stellar account key (`G…`) as the link stores it, or null if it is not one. */
 export function normalizeStellarAddress(address: string): string | null {
   return StrKey.isValidEd25519PublicKey(address) ? address : null;

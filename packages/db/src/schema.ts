@@ -11,7 +11,7 @@ import {
 
 /**
  * The AgentHabit database (spec 4.4 and 4.5). Strava data lives here at most 7 days (POL 6.2):
- * only `strava_reads` holds it, and `purgeExpiredStravaData` deletes it. Tokens are stored
+ * only `strava_reads` holds it, and `purgeExpiredData` deletes it. Tokens are stored
  * encrypted with TOKEN_ENCRYPTION_KEY; nothing in this schema holds a plaintext secret.
  */
 
@@ -83,7 +83,8 @@ export const stravaConnections = pgTable("strava_connections", {
 /**
  * The position mirror (A-2). Its key is (chain, contract, user, week_id), so production and
  * rehearsal instances, and the addresses after a testnet reset, never mix (spec 4.4). A row is
- * written only after the API read the position on-chain; `athleteId` is frozen at that moment.
+ * written only after the API read the position on-chain; `athleteId` is frozen at that moment,
+ * and cleared once the position is settled live, when nothing needs it any more (A-20).
  */
 export const positions = pgTable(
   "positions",
@@ -92,7 +93,7 @@ export const positions = pgTable(
     contract: text("contract").notNull(),
     user: text("user").notNull(),
     weekId: bigint("week_id", { mode: "bigint" }).notNull(),
-    athleteId: bigint("athlete_id", { mode: "bigint" }).notNull(),
+    athleteId: bigint("athlete_id", { mode: "bigint" }),
     /** In the token's smallest unit, as a decimal string: it is an i128 on Stellar. */
     amount: text("amount").notNull(),
     goalM: bigint("goal_m", { mode: "bigint" }).notNull(),
@@ -114,7 +115,9 @@ export const settleModeEnum = pgEnum("settle_mode", ["dry-run", "live"]);
 
 /**
  * What the settler decided for each position (T6 writes it). Keeps the outcome and the hash
- * forever, never the distance (spec 4.5).
+ * forever, never the distance (spec 4.5). The mode is part of the key: a `dry-run` and then the
+ * `live` settlement of the same position are two records, never a clash after the transaction
+ * was sent.
  */
 export const settlements = pgTable(
   "settlements",
@@ -130,7 +133,9 @@ export const settlements = pgTable(
     reason: text("reason").notNull(),
     settledAt: timestamp("settled_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.chain, table.contract, table.user, table.weekId] })],
+  (table) => [
+    primaryKey({ columns: [table.chain, table.contract, table.user, table.weekId, table.mode] }),
+  ],
 );
 
 /**

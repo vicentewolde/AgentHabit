@@ -1,5 +1,5 @@
 import { AgentHabitError, type ChainId } from "@agenthabit/core";
-import { and, eq, exists, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, exists, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { Database } from "./client.js";
 import {
@@ -15,6 +15,8 @@ import {
 
 /** How long Strava data may be kept (POL 6.2, spec 4.5). */
 export const STRAVA_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** A revoked athlete's data goes within 30 days (POL 7.4). */
+export const REVOKED_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** The key of the mirror, the settlement log and the Strava cache (spec 4.4). */
 export interface PositionKey {
@@ -101,6 +103,28 @@ export async function findWalletLink(
     .from(walletLinks)
     .where(and(eq(walletLinks.chain, chain), eq(walletLinks.address, address)));
   return link ?? null;
+}
+
+/**
+ * Removes one wallet's link to `athleteId` and returns how many wallets still link to it, in one
+ * transaction, so two disconnects cannot both see the other's link.
+ */
+export async function deleteWalletLink(
+  db: Database,
+  chain: ChainId,
+  address: string,
+  athleteId: bigint,
+): Promise<number> {
+  return db.transaction(async (tx) => {
+    await tx
+      .delete(walletLinks)
+      .where(and(eq(walletLinks.chain, chain), eq(walletLinks.address, address)));
+    const others = await tx
+      .select({ address: walletLinks.address })
+      .from(walletLinks)
+      .where(eq(walletLinks.athleteId, athleteId));
+    return others.length;
+  });
 }
 
 export interface NewSession {
@@ -226,12 +250,23 @@ export async function rotateStravaTokens(
 }
 
 /**
- * The athlete revoked access, or Strava refused the refresh token (A-10). Deletes the tokens and
- * every cached Strava reading of the athlete's positions (POL 7.4), and keeps the date.
+ * The athlete revoked access, or Strava refused the refresh token (A-10). Deletes the tokens,
+ * every wallet link to the athlete and every cached Strava reading of the athlete's positions
+ * (POL 7.4), and keeps the date.
+ *
+ * With `onlyIfRefreshTokenEnc`, the revocation happens only if the stored refresh token is still
+ * that one. A refresh that lost a race to a concurrent renewal is refused by Strava as invalid
+ * (the winner rotated the token), and must not revoke the pair the winner just stored. Returns
+ * whether the connection was marked.
  */
-export async function markStravaRevoked(db: Database, athleteId: bigint, now: Date): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx
+export async function markStravaRevoked(
+  db: Database,
+  athleteId: bigint,
+  now: Date,
+  onlyIfRefreshTokenEnc?: string,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const marked = await tx
       .update(stravaConnections)
       .set({
         accessTokenEnc: null,
@@ -240,7 +275,17 @@ export async function markStravaRevoked(db: Database, athleteId: bigint, now: Da
         revokedAt: now,
         updatedAt: now,
       })
-      .where(eq(stravaConnections.athleteId, athleteId));
+      .where(
+        and(
+          eq(stravaConnections.athleteId, athleteId),
+          onlyIfRefreshTokenEnc === undefined
+            ? undefined
+            : eq(stravaConnections.refreshTokenEnc, onlyIfRefreshTokenEnc),
+        ),
+      )
+      .returning({ athleteId: stravaConnections.athleteId });
+    if (marked.length === 0) return false;
+    await tx.delete(walletLinks).where(eq(walletLinks.athleteId, athleteId));
     await tx.delete(stravaReads).where(
       exists(
         tx
@@ -257,6 +302,7 @@ export async function markStravaRevoked(db: Database, athleteId: bigint, now: Da
           ),
       ),
     );
+    return true;
   });
 }
 
@@ -343,32 +389,75 @@ export async function findStravaRead(db: Database, key: PositionKey) {
   return found ?? null;
 }
 
+export interface PurgeReport {
+  readonly stravaReads: number;
+  readonly athleteIdsCleared: number;
+  readonly revokedConnections: number;
+  readonly expiredChallenges: number;
+  readonly expiredOAuthStates: number;
+  readonly expiredSessions: number;
+}
+
 /**
- * Deletes every Strava reading older than 7 days, or whose position is already settled, whichever
- * comes first (spec 4.5). The daily Cron runs it (T6). Returns how many rows went.
+ * The daily purge (T6's Cron runs it), in one transaction:
+ * - Strava readings older than 7 days, or whose position is settled live (spec 4.5, POL 6.2);
+ * - the frozen athlete of every position settled live, which nothing needs any more (A-20);
+ * - connections revoked 30 days ago or more, with their athlete id (POL 7.4);
+ * - expired link challenges, OAuth states and sessions.
+ * A `dry-run` settlement purges nothing: the live one has not happened yet.
  */
-export async function purgeExpiredStravaData(db: Database, now: Date): Promise<number> {
-  const cutoff = new Date(now.getTime() - STRAVA_RETENTION_MS);
-  const deleted = await db
-    .delete(stravaReads)
-    .where(
-      or(
-        lte(stravaReads.readAt, cutoff),
-        exists(
-          db
-            .select()
-            .from(settlements)
-            .where(
-              and(
-                eq(settlements.chain, stravaReads.chain),
-                eq(settlements.contract, stravaReads.contract),
-                eq(settlements.user, stravaReads.user),
-                eq(settlements.weekId, stravaReads.weekId),
-              ),
-            ),
+export async function purgeExpiredData(db: Database, now: Date): Promise<PurgeReport> {
+  const readCutoff = new Date(now.getTime() - STRAVA_RETENTION_MS);
+  const revokedCutoff = new Date(now.getTime() - REVOKED_RETENTION_MS);
+  const settledLive = (table: typeof stravaReads | typeof positions) =>
+    exists(
+      db
+        .select()
+        .from(settlements)
+        .where(
+          and(
+            eq(settlements.mode, "live"),
+            eq(settlements.chain, table.chain),
+            eq(settlements.contract, table.contract),
+            eq(settlements.user, table.user),
+            eq(settlements.weekId, table.weekId),
+          ),
         ),
-      ),
-    )
-    .returning({ weekId: stravaReads.weekId });
-  return deleted.length;
+    );
+
+  return db.transaction(async (tx) => {
+    const reads = await tx
+      .delete(stravaReads)
+      .where(or(lte(stravaReads.readAt, readCutoff), settledLive(stravaReads)))
+      .returning({ weekId: stravaReads.weekId });
+    const cleared = await tx
+      .update(positions)
+      .set({ athleteId: null })
+      .where(and(isNotNull(positions.athleteId), settledLive(positions)))
+      .returning({ weekId: positions.weekId });
+    const revoked = await tx
+      .delete(stravaConnections)
+      .where(lte(stravaConnections.revokedAt, revokedCutoff))
+      .returning({ athleteId: stravaConnections.athleteId });
+    const challenges = await tx
+      .delete(linkChallenges)
+      .where(lte(linkChallenges.expiresAt, now))
+      .returning({ nonce: linkChallenges.nonce });
+    const states = await tx
+      .delete(oauthStates)
+      .where(lte(oauthStates.expiresAt, now))
+      .returning({ state: oauthStates.state });
+    const expiredSessions = await tx
+      .delete(sessions)
+      .where(lte(sessions.expiresAt, now))
+      .returning({ tokenHash: sessions.tokenHash });
+    return {
+      stravaReads: reads.length,
+      athleteIdsCleared: cleared.length,
+      revokedConnections: revoked.length,
+      expiredChallenges: challenges.length,
+      expiredOAuthStates: states.length,
+      expiredSessions: expiredSessions.length,
+    };
+  });
 }
