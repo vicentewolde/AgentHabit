@@ -1,5 +1,7 @@
 // Pure domain: weeks, limits, the settlement decision, the shared case table and the
 // ChainAdapter types (P-2). Only zod and relative imports belong here.
+
+export * from "./api-contract.js";
 export {
   type Actor,
   type AmountRef,
