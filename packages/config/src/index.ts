@@ -1,4 +1,5 @@
-// Typed, zod-validated environment (SETTLE_MODE, RPC URLs, keys).
+// Typed, zod-validated environment (SETTLE_MODE, RPC URLs, keys, and the API settings).
+export { type ApiEnv, ApiEnvSchema, parseApiEnv } from "./api-env.js";
 export {
   AVALANCHE_KEY_VARIABLES,
   type AvalancheKeyVariable,

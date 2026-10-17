@@ -3,7 +3,15 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
-    "types": []
+    "types": ["node"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "drizzle.config.ts"],
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../config"
+    }
+  ]
 }

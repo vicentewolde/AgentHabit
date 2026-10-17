@@ -12,5 +12,9 @@
   },
   "scripts": {
     "build": "tsc -b"
+  },
+  "dependencies": {
+    "@agenthabit/core": "workspace:*",
+    "zod": "4.6.7"
   }
 }

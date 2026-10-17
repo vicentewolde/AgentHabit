@@ -3,7 +3,27 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
-    "types": []
+    "types": ["node"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test"],
+  "references": [
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/config"
+    },
+    {
+      "path": "../../packages/db"
+    },
+    {
+      "path": "../../packages/strava"
+    },
+    {
+      "path": "../../packages/chain-stellar"
+    },
+    {
+      "path": "../../packages/chain-avalanche"
+    }
+  ]
 }

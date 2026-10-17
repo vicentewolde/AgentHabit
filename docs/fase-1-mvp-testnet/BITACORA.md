@@ -14,8 +14,8 @@
 ## Estado actual
 
 **Fecha:** 2026-10-17 · **Fase en curso** desde el cierre de la Fase 0 (`v0.0.1`). Spec **Aprobado** en T3.
-T4 terminada ([PR #11](https://github.com/vicentewolde/AgentHabit/pull/11)): los dos contratos existen y pasan la misma tabla de casos, sin desplegar todavía. Siguiente:
-T5 (Strava, API y km de la semana) y después T6 (despliegue en testnet y liquidación).
+T4 terminada ([PR #11](https://github.com/vicentewolde/AgentHabit/pull/11)). T5 implementada en `cc/t5-strava-api-km`,
+en revisión. La prueba con la cuenta real de Strava queda del lado del usuario. Siguiente: `/revisar`, y después T6.
 
 ## Progreso
 
@@ -24,7 +24,7 @@ Tareas agrupadas el 16-oct para ganar velocidad (equivalencias en el registro de
 | Tarea | Estado |
 |---|---|
 | T4 Núcleo y contratos | ✅ terminada |
-| T5 Strava, API y km de la semana | ⏳ pendiente |
+| T5 Strava, API y km de la semana | 👀 en revisión |
 | T6 Despliegue en testnet y liquidación | ⏳ pendiente |
 | T7 Web | ⏳ pendiente |
 | T8 Ensayo de punta a punta y publicación en Render | ⏳ pendiente |
@@ -89,3 +89,49 @@ quedaron como deuda en `docs/ESTADO.md`.
 (`d044c26e…`): local y CI construyen lo mismo. Merge por fast-forward a `main` el 17-oct.
 
 **Evidencia.** [`evidencia/T4.md`](evidencia/T4.md).
+
+---
+
+## T5 · Strava, API y km de la semana
+
+**Qué quedó funcionando.** La parte que conecta a una persona con su cuenta de Strava y cuenta sus kilómetros:
+
+- **Vincular la wallet con Strava.** La persona firma con su wallet un mensaje que escribe la API, sin mover fondos.
+  Funciona con las wallets de Stellar y de Avalanche. Así nadie puede asociar la wallet de otro a una cuenta de Strava
+  vacía. La firma abre una sesión.
+- **Conectar Strava.** La API pide el permiso que deja ver todas las carreras, incluidas las privadas, y rechaza la
+  conexión si no se lo dan. Guarda los tokens cifrados, y al renovarlos guarda siempre el nuevo, para no perder el
+  acceso.
+- **Contar los km de la semana.** Lee las actividades de Strava página por página, sin pasarse de los límites de
+  lectura, y deja solo las carreras válidas: al aire libre, grabadas con un dispositivo, no manuales y a un ritmo
+  humano. Suma en metros enteros. Si falta un dato o la lectura se corta, no inventa un total: esa semana no se
+  liquida, y si nunca se completa, el dinero vuelve a su dueño.
+- **Registrar las posiciones.** La API guarda una posición solo después de leerla en la cadena, y congela la cuenta
+  de Strava vinculada en ese momento.
+- **Borrar lo de Strava.** Los datos de Strava se borran a los 7 días o al liquidar, como piden sus términos.
+
+Todo se probó con un Strava simulado y datos inventados: ningún dato real pasó por git ni por un prompt.
+
+**Lo que falta, del lado del usuario.** Crear la app de Strava y la base en Neon, aplicar las migraciones y correr las
+pruebas con la cuenta real (`docs/integraciones/strava.md`, sección 8). Son las que confirman lo que la documentación
+de Strava no dice:
+- el máximo de actividades por página;
+- si cada página cuenta como una lectura;
+- cómo vienen las carreras de Garmin;
+- el cuerpo exacto del error de un token revocado.
+
+**Lo que cambió respecto del plan.**
+- **Dos notas verificadas nuevas:** `docs/integraciones/strava.md` y `docs/integraciones/firmas.md`. La segunda no
+  estaba en el spec, pero la firma del vínculo la necesitaba. Corrigieron dos cosas de la 4.8:
+  - la desconexión usa `/oauth/revoke`;
+  - "token solo en cabecera desde 2027" no aparece en el changelog oficial. El cliente igual nunca manda el token
+    por URL.
+- **Una carrera con datos faltantes deja la lectura incompleta** (`A-17`, D3), en vez de excluirse en silencio.
+- **Una tabla más, `oauth_states`** (`A-18`), porque el callback de Strava llega sin sesión.
+- **Una duda de términos para antes de T6.** POL 5.16(c) sobre reusar tokens entre la API y el liquidador es ambigua.
+  No bloquea la Fase 1; quedó para leer y preguntar a Strava.
+
+**Decisiones nuevas.** `A-15` (PGlite en los tests), `A-16` (firma del vínculo), `A-17` (reglas del cliente de
+Strava) y `A-18` (callback de OAuth).
+
+**Evidencia.** [`evidencia/T5.md`](evidencia/T5.md).

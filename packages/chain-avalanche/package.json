@@ -12,5 +12,9 @@
   },
   "scripts": {
     "build": "tsc -b"
+  },
+  "dependencies": {
+    "@agenthabit/core": "workspace:*",
+    "viem": "2.57.7"
   }
 }

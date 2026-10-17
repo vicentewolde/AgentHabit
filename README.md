@@ -207,6 +207,26 @@ Regenerate the shared case table both contracts run, after changing it in `packa
 pnpm run cases:gen
 ```
 
+Generate a migration after changing `packages/db/src/schema.ts` (reads the schema only, no
+database):
+
+```bash
+pnpm run db:generate
+```
+
+Apply the migrations to the Neon database in `DATABASE_URL` (touches the network, moves no
+funds):
+
+```bash
+pnpm run db:migrate
+```
+
+Run the API on `API_PORT` (default 3000), reading `.env.local`:
+
+```bash
+pnpm run api:dev
+```
+
 Testnet keys, Friendbot and the USDC trustline (touches Stellar testnet; safe to run again):
 
 ```bash
@@ -222,6 +242,11 @@ nothing: it prints the addresses to paste into the AVAX and Circle USDC faucets 
 `pnpm run bootstrap` creates `.env.local` from `.env.example` on its first run and fills in the
 keys; follow the comments for the rest. Keys are never typed into argv. Settlement runs in
 `SETTLE_MODE=dry-run` by default: it computes and prints, but does not sign.
+
+The API also needs `DATABASE_URL` (Neon), `TOKEN_ENCRYPTION_KEY` (32 random bytes in base64,
+for example from `openssl rand -base64 32`), and the Strava app's `STRAVA_CLIENT_ID`,
+`STRAVA_CLIENT_SECRET` and `STRAVA_REDIRECT_URI`. Strava data never goes to an AI tool, a log
+or git (Strava API Policy 5.3); tests use synthetic fixtures only.
 
 ## License
 

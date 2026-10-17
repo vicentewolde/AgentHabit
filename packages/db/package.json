@@ -8,9 +8,26 @@
       "@agenthabit/source": "./src/index.ts",
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
+    },
+    "./testing": {
+      "@agenthabit/source": "./src/test-database.ts",
+      "types": "./dist/src/test-database.d.ts",
+      "default": "./dist/src/test-database.js"
     }
   },
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@agenthabit/config": "workspace:*",
+    "@agenthabit/core": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11"
   }
 }

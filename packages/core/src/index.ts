@@ -53,6 +53,24 @@ export {
   usdcToUnits,
   validateParams,
 } from "./limits.js";
+export {
+  buildLinkMessage,
+  FUJI_CHAIN_ID,
+  LINK_STATEMENT,
+  type LinkMessageInput,
+} from "./link-message.js";
+export {
+  type ActivitySummary,
+  type ActivityVerdict,
+  COUNTED_SPORT_TYPES,
+  FASTEST_PACE_S_PER_KM,
+  judgeActivity,
+  type MissingField,
+  type RejectionReason,
+  type WeekTotal,
+  weekStart,
+  weekTotal,
+} from "./runs.js";
 export { goalMet } from "./settlement.js";
 export {
   committableWeek,

@@ -13,6 +13,9 @@ Estados: `Vigente` · `Superada` · `Pendiente`
 - **`A-8` a `A-11`:** las decidió el usuario el 16-oct, en las preguntas de T3.
 - **`A-12` a `A-14`:** las tomó Claude Code en T4, donde el spec dejaba la cifra o el detalle a esa tarea. Se
   revisan con `/revisar` antes del merge.
+- **`A-15` a `A-18`:** las tomó Claude Code en T5, con lo verificado por `integraciones` en
+  `docs/integraciones/strava.md` y `firmas.md`. El usuario pidió seguir sin pedirle aprobación; se revisan con
+  `/revisar` antes del merge.
 - Las referencias a tareas usan la numeración agrupada del 16-oct (T4 a T9; ver el registro de cambios del spec).
 
 ---
@@ -273,3 +276,97 @@ Ese par necesita un token que cobre comisión, y el SAC nunca la cobra, así que
 
 **Alternativa descartada:** comprobar el ancla también en `settle` y `release_if_stale`. Es una validación que
 nunca puede fallar sin que antes falle `PositionNotFound`.
+
+---
+
+### A-15 · Los tests de la base corren sobre PGlite · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T5
+
+Los tests de `packages/db` y `apps/api` usan PGlite, un Postgres en memoria (`@agenthabit/db/testing`), con todas las
+migraciones de `packages/db/drizzle` aplicadas. En producción la base es Neon, por `pg` (`P-5`).
+
+**Motivo.** `pnpm check` no toca la red, y los tests tienen que correr el mismo SQL que Neon, incluidas las
+migraciones. AgentSales usa la misma combinación.
+
+**Alternativa descartada:** una rama de Neon para los tests. Exige red y credenciales en CI, y deja a `pnpm check`
+dependiendo de un servicio externo.
+
+---
+
+### A-16 · El vínculo se firma con el estándar de mensajes de cada cadena · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T5
+
+**El mensaje.**
+- En Avalanche, el formato EIP-4361 (SIWE). En Stellar, que no tiene un estándar equivalente, la misma plantilla
+  adaptada (`buildLinkMessage`, `firmas.md` 5.4).
+- La API escribe el texto, lo guarda con el nonce y verifica la firma contra el texto guardado, nunca contra uno que
+  reenvíe la web.
+
+**La verificación.**
+- Stellar: SEP-53 con `Keypair#verifyMessage`. `verify` daría siempre falso.
+- Avalanche: EIP-191 con `verifyMessage` de viem, solo para cuentas EOA. Las wallets de contrato (ERC-1271) no
+  entran en el MVP.
+
+**El nonce y la sesión.**
+- El nonce vale 5 minutos y se quema antes de verificar, en una sola sentencia. Así un desafío se prueba una sola
+  vez, aunque la firma falle.
+- La sesión dura 24 horas. Viaja como `Bearer`, y en la base solo queda su SHA-256.
+
+**Motivo.** Las wallets de `P-7` firman así sin pasos extra. SIWE además hace que la wallet compare el dominio con el
+origen de la página, lo que frena el phishing. Guardar el texto evita un parser y sus ambigüedades.
+
+**Alternativa descartada:** SEP-10 en Stellar. Exige `stellar.toml`, una clave de servidor y firmar una transacción
+que no es una transacción, justo lo que SEP-53 quiere evitar.
+
+---
+
+### A-17 · Reglas del cliente de Strava · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T5
+
+Lo verificado está en `docs/integraciones/strava.md`.
+
+**Conexión y desconexión.**
+- La conexión exige `activity:read_all` en el redirect y en la respuesta del token. Si el token no trae `scope`, se
+  rechaza.
+- La desconexión usa `POST /oauth/revoke` con HTTP Basic, el único endpoint soportado desde el 1-jun-2027. Cuenta
+  como revocación (`A-10`) aunque Strava no responda.
+
+**Cuándo hay revocación.** Una renovación rechazada es revocación (`A-10`) solo cuando el cuerpo de Strava nombra
+al refresh token como inválido (`field = refresh_token`, `code = invalid` o `revoked`). Todo lo demás es un error
+pasajero que solo salta la posición: un 429, un 5xx, la red o cualquier otro cuerpo. El cuerpo exacto se mide en la
+prueba 8.5 de `strava.md`.
+
+**La lectura de la semana.**
+- Pide `after = week_start − 1` y `before = week_end + 1`, y aplica la ventana exacta en el núcleo.
+- Pagina hasta una página vacía, con un tope de 20 páginas.
+- Se detiene si las cabeceras `X-ReadRateLimit-*` dicen que el límite se agotó.
+
+**Si falta un dato** (D3). Si una carrera de la semana no trae un dato que el filtro necesita (`manual`, la distancia
+o el tiempo), la lectura queda incompleta y no sirve para liquidar. Si nunca se completa, la posición vuelve a su
+dueño por `release_if_stale`. Que no haya `device_name` ni `upload_id` sí es una respuesta: esa carrera no cuenta.
+
+**Los tokens** solo viajan en la cabecera `Authorization` o en el cuerpo, nunca en la URL ni en un error.
+
+**Motivo.** El error del verificador nunca le cuesta al usuario (spec 4.6). Una regla de revocación amplia
+convertiría un fallo de Strava en un `Forfeited`.
+
+**Alternativa descartada:** excluir en silencio la actividad a la que le falta un dato. Una carrera real podría
+quedar fuera sin que nadie lo note, y el usuario perdería su depósito.
+
+---
+
+### A-18 · El callback de OAuth lo recibe la API, con el `state` en la base · `Vigente`
+**Fecha:** 2026-10-17 · **Tarea:** T5
+
+Strava redirige a `STRAVA_REDIRECT_URI`, en la API (`/auth/strava/callback`), sin sesión.
+- El `state` lo genera `/strava/connect`, ligado a la wallet de la sesión, y se guarda en `oauth_states`. Se usa una
+  vez y vale 10 minutos.
+- La API canjea el código, guarda los tokens cifrados y vincula la wallet al atleta.
+- Después devuelve el navegador a la web con una sola palabra (`connected`, `scope`, `denied`, `expired` o `error`),
+  sin código ni token en la URL.
+
+**Motivo.** Una redirección del navegador no lleva la cabecera de la sesión. El `state` en la base liga el callback
+a quien empezó la conexión y además protege contra CSRF.
+
+**Alternativa descartada:** que la web reciba el código y lo reenvíe a la API. Pone el código en una página más y
+suma un paso sin ganar nada.

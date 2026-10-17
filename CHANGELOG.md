@@ -7,6 +7,10 @@ Cada tag se crea solo con permiso del usuario.
 ## [Sin publicar]
 
 ### Añadido
+- **Strava y la API (T5):** la API vincula una wallet de Stellar o Avalanche con una cuenta de Strava mediante un
+  mensaje firmado, conecta Strava pidiendo ver todas las carreras y guarda los tokens cifrados. Cuenta los km de la
+  semana solo con carreras válidas y registra una posición solo después de leerla en la cadena. Los datos de Strava se
+  borran a los 7 días. Probado con un Strava simulado; la prueba con la cuenta real queda pendiente.
 - **Los dos contratos (T4):** el de Avalanche (Solidity) y el de Stellar (Soroban) guardan el depósito, lo devuelven
   si se cumple la meta, lo dejan bloqueado si no, y permiten que cualquiera lo devuelva a su dueño si el oráculo no
   liquidó a tiempo. Los dos pasan la misma tabla de 45 casos, escrita una sola vez en el núcleo común. Todavía no

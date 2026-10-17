@@ -12,5 +12,20 @@
   },
   "scripts": {
     "build": "tsc -b"
+  },
+  "dependencies": {
+    "@agenthabit/chain-avalanche": "workspace:*",
+    "@agenthabit/chain-stellar": "workspace:*",
+    "@agenthabit/config": "workspace:*",
+    "@agenthabit/core": "workspace:*",
+    "@agenthabit/db": "workspace:*",
+    "@agenthabit/strava": "workspace:*",
+    "@hono/node-server": "2.1.5",
+    "hono": "4.13.13",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@stellar/stellar-sdk": "17.2.1",
+    "viem": "2.57.7"
   }
 }

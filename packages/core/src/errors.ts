@@ -17,7 +17,29 @@ export type AgentHabitErrorCode =
   /** A network service (RPC, Friendbot) failed or answered something unexpected. */
   | "NetworkError"
   /** An output line was about to carry a secret; it is never written. */
-  | "SecretLeak";
+  | "SecretLeak"
+  /** A wallet link was refused: bad or foreign signature, expired or reused nonce. */
+  | "LinkRejected"
+  /** An HTTP request carries no valid session. */
+  | "Unauthenticated"
+  /** A request body or query failed validation. */
+  | "InvalidRequest"
+  /** A position the web reported does not exist on-chain as reported. */
+  | "PositionUnverified"
+  /** The athlete revoked AgentHabit's access, or Strava refused the refresh token (A-10). */
+  | "StravaRevoked"
+  /** The athlete did not grant `activity:read_all`. */
+  | "StravaScopeMissing"
+  /** Strava's read limit is used up, or it answered 429. */
+  | "StravaRateLimited"
+  /** Strava answered something that does not match its documented shape. */
+  | "StravaResponseInvalid"
+  /** A week's reading could not be completed, so it must not be used to settle (spec 4.6). */
+  | "StravaIncompleteRead"
+  /** The database answered something its schema rules out. */
+  | "DatabaseError"
+  /** A stored token does not decrypt with TOKEN_ENCRYPTION_KEY. */
+  | "TokenDecryptFailed";
 
 /** Structured, non-secret context attached to an error for logs and tests. */
 export type AgentHabitErrorDetails = Readonly<Record<string, unknown>>;

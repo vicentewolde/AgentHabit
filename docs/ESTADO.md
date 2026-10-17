@@ -13,7 +13,7 @@
 **Fase anterior:** Fase 0 · Fundamentos, **cerrada** el 16-oct con el tag `v0.0.1`
 ([bitácora](fase-0-fundamentos/BITACORA.md), con la verificación de criterios y la retro).
 **Última tarea terminada:** T4 Núcleo y contratos ([PR #11](https://github.com/vicentewolde/AgentHabit/pull/11), mergeado el 17-oct por fast-forward).
-**Siguiente paso:** `/tarea T5` — Strava, API y km de la semana (necesita la app de Strava y Neon). Después, `/tarea T6` — despliegue en testnet y liquidación.
+**Siguiente paso:** `/revisar` de T5 (rama `cc/t5-strava-api-km`). Después, `/tarea T6` — despliegue en testnet y liquidación.
 
 ## Progreso de la Fase 1
 
@@ -23,7 +23,7 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
 | Tarea | Estado | Rama / PR |
 |---|---|---|
 | T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | ✅ terminada | [PR #11](https://github.com/vicentewolde/AgentHabit/pull/11) |
-| T5 Strava, API y km de la semana | ⏳ pendiente | |
+| T5 Strava, API y km de la semana | 👀 en revisión | `cc/t5-strava-api-km` |
 | T6 Despliegue en testnet y liquidación | ⏳ pendiente | |
 | T7 Web (compromiso, estado de la semana, reglas) | ⏳ pendiente | |
 | T8 Ensayo de punta a punta y publicación en Render | ⏳ pendiente | |
@@ -37,11 +37,29 @@ Tareas agrupadas el 16-oct para ganar velocidad: 14 pasan a 6 (equivalencias en 
   README. Si no, un `brew upgrade` lo cambiaría antes de T6, y el wasm local dejaría de coincidir con el de CI.
 - **Para T6:** pedir a mano AVAX de prueba para las tres direcciones de Fuji, y USDC de prueba para el usuario de
   prueba en las dos cadenas. Las direcciones están al final de la salida de `pnpm run bootstrap`.
-- **Para T5 (bloquea su arranque):** crear la app de Strava, que requiere tu suscripción y nace en modo un
-  jugador, y una base de datos en Neon.
+- **Para cerrar la prueba técnica de T5:**
+  - Crear la app de Strava (requiere tu suscripción) y una base en Neon, y poner sus valores en `.env.local`.
+  - Correr `pnpm run db:migrate`.
+  - Hacer las pruebas 8.1 a 8.8 de `docs/integraciones/strava.md`, con tu cuenta. Traer al chat solo conclusiones
+    sobre la API, sin distancias, fechas ni conteos (POL 5.3).
+  - Hacer las pruebas con wallet de la sección 8 de `docs/integraciones/firmas.md`, sin mover fondos:
+    - Freighter, con tildes y saltos de línea;
+    - xBull;
+    - MetaMask;
+    - Core, que podría no soportar `personal_sign`.
+- **Antes de T6:** leer el texto de POL 5.16(c) sobre reusar tokens entre servidores (`strava.md`, sección 9). Es
+  ambiguo para la API y el liquidador, y conviene incluir la pregunta en el correo a developers@strava.com.
 
 ## Notas
 
+- **T5:**
+  - La API no acepta posiciones todavía en el servidor real: `knownContracts` está vacío y la lectura en la cadena
+    llega con T6. En los tests se usa un adaptador simulado.
+  - **Deuda para T6:**
+    - el `CommitReader` real sobre los adaptadores;
+    - `knownContracts` desde `deployments/*.json`;
+    - el liquidador usando `freshAccessToken` y `readWeek`, y la purga diaria;
+    - un solo proceso renueva tokens (POL 5.16).
 - **T4:** la tabla de casos se regenera con `pnpm run cases:gen`; `pnpm check` falla si `contracts/fixtures/cases.json`
   quedó desactualizado. Los errores del contrato se numeran desde 101 (`A-12`).
 - **Deuda para T6, de la revisión de T4:**

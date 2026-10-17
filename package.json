@@ -19,6 +19,9 @@
     "contracts:build:stellar": "cd contracts/stellar && stellar contract build --locked",
     "contracts:build:evm": "forge build --root contracts/evm",
     "cases:gen": "tsx --conditions=@agenthabit/source scripts/gen-cases.ts",
+    "db:generate": "pnpm --filter @agenthabit/db run db:generate",
+    "db:migrate": "tsx --conditions=@agenthabit/source packages/db/src/migrate.ts",
+    "api:dev": "tsx --conditions=@agenthabit/source apps/api/src/server.ts",
     "bootstrap": "tsx --conditions=@agenthabit/source scripts/bootstrap.ts"
   },
   "devDependencies": {
