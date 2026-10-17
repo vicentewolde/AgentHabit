@@ -10,3 +10,12 @@ allowBuilds:
   # esbuild (through tsx) only verifies its binary in postinstall; the binary arrives as a
   # per-platform optional dependency, so its script never needs to run. Same as AgentSales.
   esbuild: false
+  # The next four arrive only through @creit.tech/stellar-wallets-kit (T7a, P-7); none is needed.
+  # @reown/appkit (WalletConnect, which P-7 leaves out): its postinstall only checks a version.
+  '@reown/appkit': false
+  # Optional native speed-up for websockets (ws); it falls back to pure JS.
+  bufferutil: false
+  # Optional native secp256k1 pulled in by NEAR code inside the kit; it falls back to pure JS.
+  secp256k1: false
+  # Optional native speed-up for websockets (ws); it falls back to pure JS.
+  utf-8-validate: false
