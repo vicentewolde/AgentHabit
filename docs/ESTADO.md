@@ -70,6 +70,10 @@ liquidador, en `dry-run` primero.
 
 ## Notas
 
+- **Deuda de T6a, de la revisión:**
+  - Un contrato vencido por inactividad pide restaurar su estado (`restorePreamble`). El cliente hoy lo trata como un
+    error de lectura. Vale con un `commit` por semana, pero hay que documentarlo o manejarlo.
+  - Falta un límite de pedidos por IP antes de publicar.
 - **T5:**
   - La API no acepta posiciones todavía en el servidor real: `knownContracts` está vacío y la lectura en la cadena
     llega con T6. En los tests se usa un adaptador simulado.
