@@ -138,6 +138,25 @@ export function decodeContractCall(
   };
 }
 
+/**
+ * What the Stellar Asset Contract's own error numbers mean for a user, from soroban-env-host's
+ * `ContractError`. 10 was confirmed live on testnet (a wallet with no USDC); 11 and 13 come from
+ * that list. Any other token error stays a bare number.
+ */
+const TOKEN_REASONS: Readonly<Record<number, string>> = {
+  10: "InsufficientBalance",
+  11: "TokenBlocked",
+  13: "NoUsdcTrustline",
+};
+
+/** Why the contract or the token refused, in a word the web can turn into plain language. */
+export function rejectionReason(
+  known: { name: string | null; code: number } | null,
+): string | null {
+  if (known === null) return null;
+  return known.name ?? TOKEN_REASONS[known.code] ?? null;
+}
+
 /** `HostError: Error(Contract, #106)` → our error's name, or the bare code of another contract. */
 export function contractErrorFrom(message: string): { name: string | null; code: number } | null {
   const match = /Error\(Contract, #(\d+)\)/.exec(message);
@@ -440,6 +459,7 @@ export class StellarContractClient {
         method,
         contractError: known?.name ?? null,
         contractErrorCode: known?.code ?? null,
+        reason: rejectionReason(known),
       },
     });
   }

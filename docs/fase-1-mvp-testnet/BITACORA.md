@@ -185,13 +185,14 @@ Falta aplicar las migraciones con `pnpm run db:migrate`, ya con el código en `m
 
 ---
 
-## T6a · Contratos vivos en Stellar (en curso)
+## T6a · Contratos vivos en Stellar
 
 Primera parte de T6 bajo el plan acelerado (`A-22`): lo que el socio del usuario necesita para comprometer antes del
 domingo 25.
 
-**Qué quedó funcionando.** El código está listo y probado con una red simulada. Falta desplegarlo, y eso necesita el
-OK del usuario.
+**Qué quedó funcionando.** El contrato de producción está desplegado en Stellar testnet desde el 17-oct, con el OK
+del usuario: [`CDK2X6SNXMNQDTWEKSTHB5M6N2CLK2RCAFKSTICEKWZV7AL5VPEFUDGR`](https://stellar.expert/explorer/testnet/contract/CDK2X6SNXMNQDTWEKSTHB5M6N2CLK2RCAFKSTICEKWZV7AL5VPEFUDGR). Todo lo demás está probado con una red
+simulada y, en lo que se pudo, contra la red real.
 - **El despliegue de la instancia de producción de Stellar.** Un comando que primero muestra el plan y solo envía si
   se le dice. Si se repite no hace nada, y si algo no coincide se detiene en lugar de adivinar. Deja el contrato
   registrado en `deployments/stellar-testnet.json`.
@@ -215,8 +216,13 @@ OK del usuario.
 
 El detalle está en [`evidencia/T6a.md`](evidencia/T6a.md).
 
-**Lo que falta de T6a.** Desplegar (con OK, y con el código ya en `main` para que el comando lea tu `.env.local`),
-comprometer una vez desde el usuario de prueba para ver el contrato funcionando en la red y guardar las salidas.
+**Contra la red real.** El despliegue pasó a la primera, repetirlo no hace nada, y una comprobación de solo lectura
+(`pnpm run smoke:stellar`) confirmó que el cliente decodifica bien la configuración, la semana, el total perdido y las
+posiciones. Un compromiso simulado del usuario de prueba, que aún no tiene USDC, fue rechazado con el motivo
+`InsufficientBalance`: así la web puede decir "no tienes suficiente USDC" en lugar de un error genérico.
+
+**Lo que no se hizo.** Un compromiso real: el usuario de prueba no tiene USDC y lo hará el socio por la web. Queda
+para el ensayo del viernes 23.
 
 **Decisiones nuevas.** `A-22` (el plan), `A-23` (la API arma y reenvía) y `A-24` (cómo despliega el comando).
 

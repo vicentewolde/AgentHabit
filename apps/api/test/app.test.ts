@@ -982,6 +982,21 @@ describe("the transactions the wallet signs", () => {
     expect(await response.json()).toEqual({ error: "ContractRejected" });
   });
 
+  it("says why when the contract or the token refused: not enough USDC, wrong week, and so on", async () => {
+    const { session } = await connectedWallet();
+    for (const reason of ["InsufficientBalance", "NoUsdcTrustline", "AlreadyCommitted"]) {
+      chain.reject = new AgentHabitError("ContractRejected", "refused", { details: { reason } });
+
+      const response = await app.request(
+        "/tx/commit",
+        json({ amount: "200000000", goalM: 15_000 }, bearer(session)),
+      );
+
+      expect(response.status, reason).toBe(422);
+      expect(await response.json()).toEqual({ error: "ContractRejected", reason });
+    }
+  });
+
   it("builds the release for the wallet's own position", async () => {
     const { wallet, session } = await connectedWallet();
 

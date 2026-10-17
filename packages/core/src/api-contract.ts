@@ -228,5 +228,14 @@ export const SubmitTxResponseSchema = z.object({
 });
 export type SubmitTxResponse = z.infer<typeof SubmitTxResponseSchema>;
 
-/** The error body of every failing response. */
-export const ErrorResponseSchema = z.object({ error: z.string() });
+/**
+ * The error body of every failing response. `reason` is set when the contract or the token refused
+ * a call (`ContractRejected`): one of the contract's own error names (`AmountOutOfRange`,
+ * `GoalOutOfRange`, `WrongWeek`, `AlreadyCommitted`, `NotStaleYet`, `PositionNotFound`, ...) or a
+ * token reason (`InsufficientBalance`: not enough USDC, `NoUsdcTrustline`: the wallet cannot hold
+ * USDC yet, `TokenBlocked`). The web turns it into plain language.
+ */
+export const ErrorResponseSchema = z.object({
+  error: z.string(),
+  reason: z.string().optional(),
+});

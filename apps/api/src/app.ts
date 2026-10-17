@@ -340,7 +340,13 @@ export function createApp(deps: ApiDeps): Hono {
     deps.log(
       `${c.req.method} ${c.req.path} ${status} ${isAgentHabitError(error) ? code : "Unexpected"}`,
     );
-    return c.json({ error: code }, status);
+    // A refusal by the contract or the token carries its reason (a contract error's name or a token
+    // reason), so the web can say "not enough USDC" and not just "refused". Never the raw message.
+    const reason =
+      isAgentHabitError(error) && error.code === "ContractRejected"
+        ? error.details.reason
+        : undefined;
+    return c.json(typeof reason === "string" ? { error: code, reason } : { error: code }, status);
   });
 
   app.get("/health", (c) => c.json({ ok: true }));

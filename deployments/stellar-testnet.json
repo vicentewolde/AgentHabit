@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "network": "stellar-testnet",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "instances": [
+    {
+      "kind": "production",
+      "status": "live",
+      "contract": "CDK2X6SNXMNQDTWEKSTHB5M6N2CLK2RCAFKSTICEKWZV7AL5VPEFUDGR",
+      "codeHash": "d044c26e67e51e9c52acc83f8fa5e52856faf2dc6aeaeb36e27a8a6baf9a1013",
+      "token": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+      "oracle": "GAIDM27MJGL3NCEWXQUDINJJ6MVT7CLVFECRNCMW4IZPJGZIBUT6DTBC",
+      "params": {
+        "minAmount": "200000000",
+        "maxAmount": "500000000",
+        "minGoalM": "10000",
+        "maxGoalM": "300000",
+        "weekAnchor": "1791774000",
+        "weekLen": "604800",
+        "grace": "172800",
+        "staleAfter": "604800"
+      },
+      "txHash": "ea67f35dc028c8bf451e6470fe61a432f9e4efe60b8b47ae1f97f7a7f5840255",
+      "deployedAt": "2026-10-17T21:37:41.866Z"
+    }
+  ]
+}

@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import {
   contractErrorFrom,
   decodeContractCall,
+  rejectionReason,
   type SorobanServer,
   StellarContractClient,
 } from "../src/contract-client.js";
@@ -141,6 +142,35 @@ function failure_sync(run: () => unknown): unknown {
   }
   return "no error";
 }
+
+describe("rejectionReason", () => {
+  it("names our own errors and the token errors a user can act on, and leaves the rest", () => {
+    expect(rejectionReason(contractErrorFrom("Error(Contract, #106)"))).toBe("WrongWeek");
+    expect(rejectionReason(contractErrorFrom("Error(Contract, #10)"))).toBe("InsufficientBalance");
+    expect(rejectionReason(contractErrorFrom("Error(Contract, #11)"))).toBe("TokenBlocked");
+    expect(rejectionReason(contractErrorFrom("Error(Contract, #13)"))).toBe("NoUsdcTrustline");
+    expect(rejectionReason(contractErrorFrom("Error(Contract, #4)"))).toBeNull();
+    expect(rejectionReason(contractErrorFrom("a network hiccup"))).toBeNull();
+  });
+
+  it("travels with a refused simulation, so the web can explain it", async () => {
+    const fake = fakeServer({ prepareTransaction: new Error("HostError: Error(Contract, #10)") });
+
+    const error = await failure(
+      client(fake.server).prepareCommit({
+        user: user.publicKey(),
+        weekId: 3n,
+        amount: 1n,
+        goalM: 1n,
+      }),
+    );
+
+    expect(isAgentHabitError(error) && error.details).toMatchObject({
+      contractErrorCode: 10,
+      reason: "InsufficientBalance",
+    });
+  });
+});
 
 describe("contractErrorFrom", () => {
   it("names our own errors by their number and leaves another contract's as a bare code", () => {

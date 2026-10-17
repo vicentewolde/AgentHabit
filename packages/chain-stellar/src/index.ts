@@ -9,6 +9,7 @@ export {
   type OnChainPosition,
   POSITION_STATE_BY_INDEX,
   type PreparedTransaction,
+  rejectionReason,
   type SorobanServer,
   StellarContractClient,
   type SubmitStatus,

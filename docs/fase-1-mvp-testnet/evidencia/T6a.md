@@ -1,8 +1,8 @@
 # Evidencia T6a · Contratos vivos en Stellar
 
-Salidas crudas del 2026-10-17, rama `cc/t6a-stellar-produccion` desde `origin/main` (`9492087`). Sin secretos: todos los
-tests usan claves sintéticas y una red simulada. **Todavía no hay un despliegue real:** esa evidencia se agrega aquí
-cuando el usuario dé el OK y el contrato esté en la red.
+Salidas crudas del 2026-10-17. El código de T6a entró a `main` por el [PR #13](https://github.com/vicentewolde/AgentHabit/pull/13);
+el despliegue y esta evidencia, por su PR de cierre. Sin secretos: los tests usan claves sintéticas y una red simulada,
+y las salidas reales de abajo solo muestran datos públicos.
 
 ## Verificación
 
@@ -51,3 +51,60 @@ importantes y varias sugerencias. Corregidos, cada uno con su test:
 | Sugerencias: operación con otro origen, argumentos raros, `getAccount` caído, `WEB_ORIGIN` con `/`, plan sin fechas, id de un contrato huérfano | Todas corregidas |
 
 Quedaron como deuda, anotadas: manejar un contrato vencido por inactividad (`restorePreamble`) y un límite de pedidos.
+
+## El despliegue real, con el OK del usuario
+
+El 17-oct, desde la carpeta principal, con las claves de `.env.local` (que el comando lee por sí mismo y no imprime).
+Antes se corrió el plan (`pnpm run deploy:stellar`, sin `--yes`), que no envió nada.
+
+```
+$ pnpm run deploy:stellar --yes
+wasm sha256: d044c26e67e51e9c52acc83f8fa5e52856faf2dc6aeaeb36e27a8a6baf9a1013
+Deployed the production instance: CDK2X6SNXMNQDTWEKSTHB5M6N2CLK2RCAFKSTICEKWZV7AL5VPEFUDGR
+  anchor (week 0 starts): 2026-10-12T03:00:00.000Z
+  now is week 0, which started 2026-10-12T03:00:00.000Z
+  a commit made now targets week 1, which starts 2026-10-19T03:00:00.000Z
+  contract: https://stellar.expert/explorer/testnet/contract/CDK2X6SNXMNQDTWEKSTHB5M6N2CLK2RCAFKSTICEKWZV7AL5VPEFUDGR
+  transaction: https://stellar.expert/explorer/testnet/tx/ea67f35dc028c8bf451e6470fe61a432f9e4efe60b8b47ae1f97f7a7f5840255
+Recorded in deployments/stellar-testnet.json
+```
+
+El wasm es el mismo que compiló la CI en T4 y en el PR #13 (`d044c26e…`): lo que se desplegó es lo que se probó. El
+comando leyó el contrato de vuelta y comprobó que contiene lo desplegado antes de registrarlo, así que `config()` se
+decodifica bien contra la red real.
+
+**Repetirlo no hace nada:**
+
+```
+$ pnpm run deploy:stellar --yes
+Already deployed, nothing to do: CDK2X6SNXMNQDTWEKSTHB5M6N2CLK2RCAFKSTICEKWZV7AL5VPEFUDGR
+```
+
+## La lectura contra la red real (`pnpm run smoke:stellar`)
+
+Solo lectura: no envía nada ni mueve fondos. Confirma lo que los tests solo simulaban: cómo decodifica el cliente las
+respuestas del contrato real.
+
+```
+contract CDK2X6SNXMNQDTWEKSTHB5M6N2CLK2RCAFKSTICEKWZV7AL5VPEFUDGR
+ok   config() matches deployments/stellar-testnet.json
+ok   current_week()
+     week 0
+ok   total_forfeited()
+     forfeited 0
+ok   get_position(test user, next week)
+     state None
+ok   the network answered the commit simulation: refused with reason InsufficientBalance
+```
+
+El usuario de prueba **no tiene USDC todavía**, y la red lo dice con el motivo `InsufficientBalance` (el error 10 del
+contrato de USDC, confirmado en vivo). Es el estado normal antes de pedir USDC en el faucet de Circle.
+
+## Verificación
+
+```
+$ pnpm check
+Checked 105 files in 59ms. No fixes applied.
+ Test Files  26 passed (26)
+      Tests  321 passed (321)
+```

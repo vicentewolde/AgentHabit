@@ -240,6 +240,12 @@ After a testnet reset has erased the recorded contract, deploy a new one:
 pnpm run deploy:stellar --yes --reset
 ```
 
+Read-only check of the deployed contract on testnet (sends nothing, moves no funds):
+
+```bash
+pnpm run smoke:stellar
+```
+
 Run the API on `API_PORT` (default 3000), reading `.env.local`:
 
 ```bash

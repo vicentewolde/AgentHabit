@@ -29,7 +29,7 @@ liquidador, en `dry-run` primero.
 |---|---|---|
 | T4 Núcleo y contratos (dominio, tabla de casos, Soroban, EVM) | ✅ terminada | [PR #11](https://github.com/vicentewolde/AgentHabit/pull/11) |
 | T5 Strava, API y km de la semana | ✅ terminada, con un pendiente: pruebas con la cuenta real de Strava | [PR #12](https://github.com/vicentewolde/AgentHabit/pull/12) |
-| **T6a** Contratos vivos en Stellar (adaptador y despliegue de producción) | 🔨 código listo y probado; **falta desplegar** (necesita tu OK), hasta el lun 19 | `cc/t6a-stellar-produccion` |
+| **T6a** Contratos vivos en Stellar (adaptador y despliegue de producción) | ✅ terminada: contrato de producción desplegado el 17-oct | [PR #13](https://github.com/vicentewolde/AgentHabit/pull/13) y su PR de cierre |
 | **T7a** Web mínima, solo Stellar | 🔨 en curso, hasta el mié 21 | |
 | **T8a** Publicación en Render | ⏳ hasta el jue 22 | |
 | T6b Liquidación, Cron, Avalanche e instancia de ensayo | ⏳ **mié 4-nov, 03:00 UTC** | |
