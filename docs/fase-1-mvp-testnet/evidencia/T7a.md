@@ -19,10 +19,11 @@ Checked 149 files in 104ms. No fixes applied.
 | `apps/web/test/flows.test.ts` | Vincular, comprometer y recuperar de punta a punta contra la API simulada; la semana confirmada antes de firmar; el compromiso firmado que no se pierde; la consulta de una transacción `PENDING`; la sesión vencida (401) |
 | `apps/web/test/app.test.tsx` | Las pantallas: sin vincular, sin Strava, con compromiso activo, esperando liquidación, semanas anteriores con "Recuperar", y los errores del contrato con el enlace al faucet |
 | `apps/web/test/reasons.test.ts` | Que el cliente conserva el `reason` de un rechazo, que cada motivo tiene su mensaje, que uno desconocido cae en el genérico y que el faucet solo aparece con `InsufficientBalance` y `NoUsdcTrustline` |
-| `apps/web/test/amounts.test.ts` | Montos en `bigint` con los 7 decimales de Stellar USDC |
-| `apps/web/test/isolation.test.ts` | Que la web no importa nada de `contracts/` ni del SDK de Stellar fuera de la wallet |
-| `apps/web/test/mock-app.test.ts` | Que la API de mentira valida con los mismos esquemas que la API real |
-| `apps/web/test/time-csp.test.ts`, `web-units.test.ts` | Fechas en UTC-3, la política CSP del build, el host del callback de Strava y la URL de la API (`https:`) |
+| `apps/web/test/amounts.test.ts` | Montos en `bigint` con los 7 decimales de Stellar USDC, metas en metros enteros y los límites exactos de monto y meta |
+| `apps/web/test/isolation.test.ts` | Que el código de la web no importa la API de mentira, `hono` ni el SDK de Stellar, que no carga nada de un CDN, que no escribe en la consola y que `localStorage` solo lo toca `pending.ts` |
+| `apps/web/test/mock-app.test.ts` | Que la API de mentira responde con la forma del contrato en cada escenario, no entrega datos sin sesión ni con un token inventado y solo acepta el origen de la web |
+| `apps/web/test/time-csp.test.ts` | Cuándo aparece el botón Recuperar, los días que quedan y que la política CSP permite solo a la web y a la API |
+| `apps/web/test/web-units.test.ts` | `VITE_API_URL` (`https:` obligatorio en producción), la lista de destinos permitidos para la redirección de Strava, que un monto nunca se trunca, que el token tenga 7 decimales y las fechas en UTC-3 |
 
 ## Lo que no se pudo verificar todavía
 
