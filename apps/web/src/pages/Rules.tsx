@@ -29,6 +29,10 @@ export function Rules() {
           Bloqueas un monto en USDC en un contrato y fijas una meta semanal de kilómetros corridos.
           Solo puedes comprometer la semana que viene. Si cumples la meta, recuperas todo.
         </p>
+        <p>
+          Las semanas van de lunes a lunes, a las 00:00 en horario UTC-3 (la hora de Chile en
+          verano). Todas las fechas de esta página están en ese horario.
+        </p>
       </Card>
 
       <Card title="Lo que se pierde no es de nadie" headingId="r-lost">
@@ -57,13 +61,22 @@ export function Rules() {
             Guardamos tus carreras de la semana por <strong>7 días como máximo</strong>. Después
             solo queda el resultado: cumpliste o no.
           </li>
-          <li>Nadie más ve tus datos: ni tus kilómetros, ni tu meta, ni tus carreras.</li>
+          <li>Tus carreras y tus kilómetros no los ve nadie más, y no se escriben en la cadena.</li>
           <li>
             Tus datos de Strava no se usan para entrenar ni alimentar ninguna inteligencia
             artificial.
           </li>
           <li>La web guarda tu sesión solo en esta pestaña; se borra al cerrarla.</li>
         </ul>
+      </Card>
+
+      <Card title="Lo que queda escrito en Stellar es público" headingId="r-public">
+        <p>
+          Tu dirección de billetera, el monto, la semana, tu meta y el resultado (cumpliste o no) se
+          escriben en la cadena de Stellar. Eso es público por naturaleza: cualquiera puede verlo en
+          el explorador de transacciones, ligado a tu dirección. Si no quieres que se asocie a ti,
+          usa una billetera que no uses para nada más.
+        </p>
       </Card>
 
       <Card title="Si no se liquida la semana" headingId="r-stale">
@@ -82,7 +95,11 @@ export function Rules() {
           Strava. Sin esta regla, quien no cumple podría revocar el acceso y recuperar su depósito.
         </p>
         {session !== null && connected !== null && (
-          <StravaCard connected={connected} onChanged={refresh} />
+          <StravaCard
+            connected={connected}
+            onChanged={refresh}
+            webOrigin={window.location.origin}
+          />
         )}
       </Card>
     </div>
