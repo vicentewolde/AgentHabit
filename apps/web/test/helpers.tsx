@@ -50,17 +50,33 @@ export interface Harness {
   /** Every URL the web asked for, to prove no secret travels in one. */
   readonly requestedUrls: string[];
   readonly fetch: typeof fetch;
+  /** Makes the next request whose URL ends with `suffix` fail like a dropped connection. */
+  readonly dropNext: (suffix: string) => void;
 }
 
 export function makeHarness(options: MockOptions = {}): Harness {
   const app = createMockApp(options);
   const requestedUrls: string[] = [];
+  const drops: string[] = [];
   const fetchImpl: typeof fetch = async (input, init) => {
     const request = new Request(input, init);
     requestedUrls.push(request.url);
+    const dropAt = drops.findIndex((suffix) => request.url.endsWith(suffix));
+    if (dropAt !== -1) {
+      drops.splice(dropAt, 1);
+      throw new TypeError("Failed to fetch");
+    }
     return app.fetch(request);
   };
-  return { app, wallet: new FakeWallet(), requestedUrls, fetch: fetchImpl };
+  return {
+    app,
+    wallet: new FakeWallet(),
+    requestedUrls,
+    fetch: fetchImpl,
+    dropNext: (suffix) => {
+      drops.push(suffix);
+    },
+  };
 }
 
 export const BASE_URL = "http://api.test";

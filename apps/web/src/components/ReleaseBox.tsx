@@ -32,6 +32,7 @@ export function ReleaseBox(props: {
         api,
         wallet,
         address: session.address,
+        instance: props.instance,
         weekId: props.weekId,
         poll,
         onStep: (step) => {

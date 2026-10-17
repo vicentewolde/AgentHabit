@@ -83,6 +83,14 @@ export function createFreighterWallet(): WalletPort {
         if (typeof result.signedTxXdr !== "string" || result.signedTxXdr === "") {
           throw new WalletError("WalletFailed", "The wallet returned no signed transaction");
         }
+        // Same check as for the message: a wallet that signed with another account than the one
+        // linked would produce a transaction the API cannot use for this user.
+        if (result.signerAddress !== undefined && result.signerAddress !== address) {
+          throw new WalletError(
+            "WalletFailed",
+            "Freighter signed with a different account than the one connected",
+          );
+        }
         return result.signedTxXdr;
       } catch (error) {
         throw toWalletError(error);

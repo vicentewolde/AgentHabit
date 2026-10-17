@@ -30,11 +30,14 @@ describe("the app bundle stays clean", () => {
     }
   });
 
-  it("does not use analytics, console logging or localStorage", () => {
+  it("does not log, and keeps localStorage to the public pending commit", () => {
     for (const file of files) {
       const text = readFileSync(file, "utf8");
       expect(text, file).not.toMatch(/console\.(log|info|debug|warn|error)/);
-      expect(text, file).not.toMatch(/localStorage\s*[.[]/);
+      // Only `pending.ts` may touch it: public chain data keyed by address, never the token.
+      if (!file.endsWith("/pending.ts")) {
+        expect(text, file).not.toMatch(/localStorage\s*[.[]/);
+      }
     }
   });
 });

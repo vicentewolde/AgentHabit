@@ -3,6 +3,7 @@ import { AgentHabitError, hasErrorCode } from "@agenthabit/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "../src/api/client.js";
 import { messageFor } from "../src/api/messages.js";
+import { isWebError } from "../src/errors.js";
 import {
   linkWallet,
   type PollOptions,
@@ -11,7 +12,7 @@ import {
   runRelease,
   waitForTx,
 } from "../src/flows.js";
-import { loadPendingCommit } from "../src/session.js";
+import { clearPending, loadPending, savePending } from "../src/pending.js";
 import { WalletError } from "../src/wallet/port.js";
 import { BASE_URL, makeHarness } from "./helpers.js";
 
@@ -20,6 +21,7 @@ const FAST_POLL: PollOptions = { intervalMs: 1, timeoutMs: 10, sleep: async () =
 
 beforeEach(() => {
   window.sessionStorage.clear();
+  window.localStorage.clear();
 });
 
 function setup(scenario: Parameters<typeof makeHarness>[0] = { scenario: "no-position" }) {
@@ -79,27 +81,32 @@ describe("link flow with a fake wallet", () => {
   });
 });
 
+async function commitArgs(t: ReturnType<typeof setup>, amount = 200_000_000n, goalM = 5000) {
+  const session = await t.login();
+  const weeks = await t.api.weeks();
+  return {
+    api: t.api,
+    wallet: t.wallet,
+    address: session.address,
+    instance: weeks.instance,
+    weekId: weeks.nextWeek.weekId,
+    amount,
+    goalM,
+  };
+}
+
 describe("commit flow", () => {
   it("signs for the API's passphrase, submits, and reports the hash", async () => {
     const t = setup();
-    const session = await t.login();
-    const { instance } = await t.api.weeks();
+    const args = await commitArgs(t, 250_000_000n, 15_000);
     const steps: string[] = [];
 
-    const outcome = await runCommit({
-      api: t.api,
-      wallet: t.wallet,
-      address: session.address,
-      instance,
-      amount: 250_000_000n,
-      goalM: 15_000,
-      onStep: (step) => steps.push(step),
-    });
+    const outcome = await runCommit({ ...args, onStep: (step) => steps.push(step) });
 
     expect(outcome.status).toBe("SUCCESS");
     expect(outcome.mirrored).toBe(true);
     expect(steps).toEqual(["preparing", "signing", "sending", "recording"]);
-    expect(loadPendingCommit()).toBeNull();
+    expect(loadPending(args.address)).toBeNull();
 
     const weeks = await t.api.weeks();
     expect(weeks.nextWeek.position).toEqual({
@@ -110,105 +117,155 @@ describe("commit flow", () => {
     });
   });
 
-  it("returns FAILED without recording anything", async () => {
+  it("returns FAILED, records nothing and clears the stored commit", async () => {
     const t = setup({ scenario: "tx-failed" });
-    const session = await t.login();
-    const { instance } = await t.api.weeks();
-    const outcome = await runCommit({
-      api: t.api,
-      wallet: t.wallet,
-      address: session.address,
-      instance,
-      amount: 200_000_000n,
-      goalM: 5000,
-    });
+    const args = await commitArgs(t);
+    const outcome = await runCommit(args);
     expect(outcome.status).toBe("FAILED");
-    expect(loadPendingCommit()).toBeNull();
+    expect(loadPending(args.address)).toBeNull();
     expect((await t.api.weeks()).nextWeek.position).toBeNull();
   });
 
   it("polls GET /tx/{hash} after PENDING and carries on when it lands", async () => {
     const t = setup({ scenario: "tx-pending" });
-    const session = await t.login();
-    const { instance } = await t.api.weeks();
+    const args = await commitArgs(t);
     const steps: string[] = [];
-    const outcome = await runCommit({
-      api: t.api,
-      wallet: t.wallet,
-      address: session.address,
-      instance,
-      amount: 200_000_000n,
-      goalM: 5000,
-      poll: FAST_POLL,
-      onStep: (step) => steps.push(step),
-    });
+    const outcome = await runCommit({ ...args, poll: FAST_POLL, onStep: (s) => steps.push(s) });
     expect(outcome).toMatchObject({ status: "SUCCESS", mirrored: true });
     expect(steps).toContain("confirming");
-    expect(loadPendingCommit()).toBeNull();
+    expect(loadPending(args.address)).toBeNull();
     expect((await t.api.weeks()).nextWeek.position?.commitTxHash).toBe(outcome.txHash);
   });
 
   it("falls back to PENDING after the polling window and keeps the hash for later", async () => {
     const t = setup({ scenario: "tx-stuck" });
-    const session = await t.login();
-    const { instance } = await t.api.weeks();
-    const outcome = await runCommit({
-      api: t.api,
-      wallet: t.wallet,
-      address: session.address,
-      instance,
-      amount: 200_000_000n,
-      goalM: 5000,
-      poll: FAST_POLL,
-    });
+    const args = await commitArgs(t);
+    const outcome = await runCommit({ ...args, poll: FAST_POLL });
     expect(outcome.status).toBe("PENDING");
-    expect(loadPendingCommit()?.txHash).toBe(outcome.txHash);
-    // Still unseen on-chain: the retry stays queued instead of dropping the hash.
-    expect(await reconcilePendingCommit({ api: t.api, address: session.address })).toBe("waiting");
-    expect(loadPendingCommit()).not.toBeNull();
+    expect(loadPending(args.address)?.txHash).toBe(outcome.txHash);
+    // Still PENDING: the record stays, and nobody may sign a second commit meanwhile.
+    const again = await reconcilePendingCommit({ api: t.api, address: args.address });
+    expect(again.result).toBe("waiting");
+    expect(again.pending?.txHash).toBe(outcome.txHash);
+    const second = await runCommit({ ...args, poll: FAST_POLL }).catch((e: unknown) => e);
+    expect(isWebError(second) && second.code === "CommitPending").toBe(true);
+    expect(t.wallet.signedXdrs).toHaveLength(1);
   });
 
-  it("keeps the hash when the position report fails after a SUCCESS", async () => {
+  it("keeps the hash when the position report fails after a SUCCESS, then reports it", async () => {
     const t = setup();
-    const session = await t.login();
-    const { instance } = await t.api.weeks();
+    const args = await commitArgs(t);
     const failingApi = {
       ...t.api,
       reportPosition: () => Promise.reject(new AgentHabitError("NetworkError", "down")),
     };
-    const outcome = await runCommit({
-      api: failingApi,
-      wallet: t.wallet,
-      address: session.address,
-      instance,
-      amount: 200_000_000n,
-      goalM: 5000,
-    });
+    const outcome = await runCommit({ ...args, api: failingApi });
     expect(outcome).toMatchObject({ status: "SUCCESS", mirrored: false });
-    expect(loadPendingCommit()?.txHash).toBe(outcome.txHash);
-    // The next load reports it with the real API.
-    expect(await reconcilePendingCommit({ api: t.api, address: session.address })).toBe("mirrored");
+    expect(loadPending(args.address)?.txHash).toBe(outcome.txHash);
+
+    const next = await reconcilePendingCommit({ api: t.api, address: args.address });
+    expect(next.result).toBe("mirrored");
+    expect(loadPending(args.address)).toBeNull();
     expect((await t.api.weeks()).nextWeek.position?.commitTxHash).toBe(outcome.txHash);
   });
 
-  it("does not report another wallet's pending commit", async () => {
+  it("survives the network dropping after signing: the signed transaction is sent again", async () => {
     const t = setup();
-    const session = await t.login();
-    const { instance } = await t.api.weeks();
+    const args = await commitArgs(t);
+    t.dropNext("/tx/submit");
+
+    const failure = await runCommit(args).catch((error: unknown) => error);
+    expect(hasErrorCode(failure, "NetworkError")).toBe(true);
+    // Signed once, never confirmed as received: the signed XDR is kept, with no hash yet.
+    const stored = loadPending(args.address);
+    expect(stored?.signedXdr).toBeDefined();
+    expect(stored?.txHash).toBeUndefined();
+    expect((await t.api.weeks()).nextWeek.position).toBeNull();
+
+    // The next load submits that same XDR (no new signature) and then reports the position.
+    const next = await reconcilePendingCommit({ api: t.api, address: args.address });
+    expect(next.result).toBe("mirrored");
+    expect(t.wallet.signedXdrs).toHaveLength(1);
+    expect(loadPending(args.address)).toBeNull();
+    expect((await t.api.weeks()).nextWeek.position?.commitTxHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("drops a stored commit once the API refuses it for good, but not on a server error", async () => {
+    const t = setup();
+    const args = await commitArgs(t);
+    const refuse = (status: number) => ({
+      ...t.api,
+      submit: () =>
+        Promise.reject(new AgentHabitError("ContractRejected", "no", { details: { status } })),
+    });
+    await runCommit({ ...args, api: refuse(502) }).catch(() => undefined);
+    expect(loadPending(args.address)).not.toBeNull();
+    clearPending(args.address);
+    await runCommit({ ...args, api: refuse(422) }).catch(() => undefined);
+    expect(loadPending(args.address)).toBeNull();
+  });
+
+  it("drops a stored hash that later turns out FAILED, with no phantom warning", async () => {
+    const t = setup();
+    const args = await commitArgs(t);
+    // A hash the chain never confirmed: the API answers FAILED for it.
+    savePending({
+      address: args.address,
+      chain: "stellar",
+      contract: args.instance.contract,
+      weekId: args.weekId,
+      txHash: "c".repeat(64),
+    });
+    const reconciled = await reconcilePendingCommit({ api: t.api, address: args.address });
+    expect(reconciled).toEqual({ result: "none", pending: null });
+    expect(loadPending(args.address)).toBeNull();
+  });
+
+  it("does not touch another wallet's stored commit", async () => {
+    const t = setup();
+    const args = await commitArgs(t);
     const failingApi = {
       ...t.api,
       reportPosition: () => Promise.reject(new AgentHabitError("NetworkError", "down")),
     };
-    await runCommit({
-      api: failingApi,
-      wallet: t.wallet,
-      address: session.address,
-      instance,
-      amount: 200_000_000n,
-      goalM: 5000,
-    });
-    expect(await reconcilePendingCommit({ api: t.api, address: "GOTHERWALLET" })).toBe("none");
-    expect(loadPendingCommit()).not.toBeNull();
+    await runCommit({ ...args, api: failingApi });
+    const other = await reconcilePendingCommit({ api: t.api, address: "GOTHERWALLET" });
+    expect(other).toEqual({ result: "none", pending: null });
+    expect(loadPending(args.address)).not.toBeNull();
+  });
+
+  it("refuses to sign when the week changed between confirming and signing", async () => {
+    let clock = Date.now();
+    const t = setup({ scenario: "no-position", now: () => new Date(clock) });
+    const args = await commitArgs(t);
+    // The user read next week as `args.weekId`; a week later the API builds for the one after.
+    clock += 7 * 24 * 60 * 60 * 1000;
+    const before = t.requestedUrls.length;
+
+    const failure = await runCommit(args).catch((error: unknown) => error);
+
+    expect(isWebError(failure) && failure.code === "WeekChanged").toBe(true);
+    expect(messageFor(failure)).toBe(
+      "La semana cambió mientras confirmabas. Revisa las fechas y confirma de nuevo.",
+    );
+    // Nothing was signed and nothing was sent or stored.
+    expect(t.wallet.signedXdrs).toHaveLength(0);
+    expect(t.requestedUrls.slice(before).filter((u) => u.endsWith("/tx/submit"))).toHaveLength(0);
+    expect(loadPending(args.address)).toBeNull();
+  });
+
+  it("refuses to sign a transaction for another network", async () => {
+    const t = setup();
+    const args = await commitArgs(t);
+    const failure = await runCommit({
+      ...args,
+      instance: {
+        ...args.instance,
+        networkPassphrase: "Public Global Stellar Network ; September 2015",
+      },
+    }).catch((error: unknown) => error);
+    expect(hasErrorCode(failure, "TransactionNotAllowed")).toBe(true);
+    expect(t.wallet.signedXdrs).toHaveLength(0);
   });
 
   it("maps a contract rejection from the API to a friendly sentence", async () => {
@@ -223,7 +280,7 @@ describe("release flow", () => {
   it("builds, signs and submits the release of an expired week", async () => {
     const t = setup({ scenario: "expired" });
     const session = await t.login();
-    const { unsettledWeeks } = await t.api.weeks();
+    const { unsettledWeeks, instance } = await t.api.weeks();
     expect(unsettledWeeks).toHaveLength(1);
     const week = unsettledWeeks[0];
     if (week === undefined) throw new Error("unreachable");
@@ -232,10 +289,35 @@ describe("release flow", () => {
       api: t.api,
       wallet: t.wallet,
       address: session.address,
+      instance,
       weekId: week.weekId,
     });
     expect(outcome.status).toBe("SUCCESS");
     expect((await t.api.weeks()).unsettledWeeks).toHaveLength(0);
+  });
+
+  it("refuses to sign when the prepared transaction is for another week", async () => {
+    const t = setup({ scenario: "expired" });
+    const session = await t.login();
+    const { unsettledWeeks, instance } = await t.api.weeks();
+    const week = unsettledWeeks[0];
+    if (week === undefined) throw new Error("unreachable");
+    const lying = {
+      ...t.api,
+      buildRelease: async (weekId: string) => ({
+        ...(await t.api.buildRelease(weekId)),
+        weekId: "999",
+      }),
+    };
+    const failure = await runRelease({
+      api: lying,
+      wallet: t.wallet,
+      address: session.address,
+      instance,
+      weekId: week.weekId,
+    }).catch((error: unknown) => error);
+    expect(isWebError(failure) && failure.code === "ReleaseWeekMismatch").toBe(true);
+    expect(t.wallet.signedXdrs).toHaveLength(0);
   });
 });
 

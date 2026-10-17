@@ -4,13 +4,20 @@ import { type CommitFormErrors, formatKm, formatUsdc, validateCommit } from "../
 import { messageFor } from "../api/messages.js";
 import { useApp } from "../app-context.js";
 import { failureSentence, REVOKE_SENTENCE } from "../copy.js";
+import { isWebError } from "../errors.js";
 import { type CommitStep, runCommit, type TxOutcome } from "../flows.js";
 import { formatMoment } from "../time.js";
 import { Button, ExplorerLink, Notice } from "./ui.js";
 
 type Phase =
   | { readonly kind: "form" }
-  | { readonly kind: "confirm"; readonly amount: bigint; readonly goalM: number }
+  | {
+      readonly kind: "confirm";
+      readonly amount: bigint;
+      readonly goalM: number;
+      /** The week as it was on screen when the user pressed "Continuar": what they confirm. */
+      readonly week: WeekView;
+    }
   | { readonly kind: "working"; readonly step: CommitStep }
   | { readonly kind: "done"; readonly outcome: TxOutcome; readonly amount: bigint };
 
@@ -28,6 +35,8 @@ export function CommitForm(props: {
   readonly instance: InstanceInfo;
   readonly stravaConnected: boolean;
   readonly onDone: () => void;
+  /** The week changed under the user: reload the weeks. */
+  readonly onStale: () => void;
 }) {
   const { api, wallet, session, poll } = useApp();
   const { instance } = props;
@@ -55,10 +64,10 @@ export function CommitForm(props: {
       return;
     }
     setErrors({});
-    setPhase({ kind: "confirm", amount: checked.amount, goalM: checked.goalM });
+    setPhase({ kind: "confirm", amount: checked.amount, goalM: checked.goalM, week: props.week });
   };
 
-  const sign = async (amount: bigint, goalM: number) => {
+  const sign = async (amount: bigint, goalM: number, weekId: string) => {
     if (session === null) return;
     setFailure(null);
     setPhase({ kind: "working", step: "preparing" });
@@ -68,6 +77,7 @@ export function CommitForm(props: {
         wallet,
         address: session.address,
         instance,
+        weekId,
         amount,
         goalM,
         poll,
@@ -85,6 +95,8 @@ export function CommitForm(props: {
     } catch (error) {
       setFailure(messageFor(error));
       setPhase({ kind: "form" });
+      // The dates on screen are stale: reload so the form shows the real next week.
+      if (isWebError(error) && error.code === "WeekChanged") props.onStale();
     }
   };
 
@@ -134,8 +146,8 @@ export function CommitForm(props: {
         </h3>
         <p>
           Vas a bloquear <strong>{shown} USDC</strong> con una meta de{" "}
-          <strong>{formatKm(phase.goalM)} km</strong> entre el {formatMoment(props.week.startsAt)} y
-          el {formatMoment(props.week.endsAt)}.
+          <strong>{formatKm(phase.goalM)} km</strong> entre el {formatMoment(phase.week.startsAt)} y
+          el {formatMoment(phase.week.endsAt)}.
         </p>
         <div className="space-y-2 rounded-lg border border-amber-500 bg-amber-50 p-3 text-amber-950">
           <p className="font-medium">{failureSentence(shown)}</p>
@@ -145,7 +157,7 @@ export function CommitForm(props: {
           Si cumples, recuperas todo. Tu billetera te mostrará la transacción para que la firmes.
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => void sign(phase.amount, phase.goalM)}>
+          <Button onClick={() => void sign(phase.amount, phase.goalM, phase.week.weekId)}>
             Entiendo, firmar y bloquear
           </Button>
           <Button variant="secondary" onClick={() => setPhase({ kind: "form" })}>

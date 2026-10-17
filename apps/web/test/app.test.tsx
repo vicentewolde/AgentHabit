@@ -192,6 +192,46 @@ describe("commit", () => {
   });
 });
 
+describe("a commit that cannot be lost", () => {
+  it("asks to confirm again, and signs nothing, when the week changed under the user", async () => {
+    let clock = Date.now();
+    const harness = makeHarness({ scenario: "no-position", now: () => new Date(clock) });
+    const user = userEvent.setup();
+    mount(harness);
+    await signIn(user);
+    await user.type(await screen.findByLabelText("Monto a bloquear (USDC)"), "25");
+    await user.type(screen.getByLabelText("Meta de la semana (km)"), "15");
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    await screen.findByRole("region", { name: "Revisa antes de firmar" });
+
+    clock += 7 * 24 * 60 * 60 * 1000; // Monday 00:00 (UTC-3) passes while the user reads.
+    await user.click(screen.getByRole("button", { name: "Entiendo, firmar y bloquear" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "La semana cambió mientras confirmabas. Revisa las fechas y confirma de nuevo.",
+    );
+    expect(harness.wallet.signedXdrs).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Continuar" })).toBeTruthy();
+  });
+
+  it("shows a waiting transaction instead of the form, also after a reload", async () => {
+    const harness = makeHarness({ scenario: "tx-stuck" });
+    const user = userEvent.setup();
+    const first = mount(harness);
+    await signIn(user);
+    await user.type(await screen.findByLabelText("Monto a bloquear (USDC)"), "20");
+    await user.type(screen.getByLabelText("Meta de la semana (km)"), "5");
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    await user.click(await screen.findByRole("button", { name: "Entiendo, firmar y bloquear" }));
+    await screen.findByText(/aún no se confirma/);
+    first.unmount();
+
+    mount(harness); // a fresh page load: the session is still in this tab
+    expect(await screen.findByText(/Tienes una transacción en espera/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Continuar" })).toBeNull();
+  });
+});
+
 describe("week status", () => {
   it("shows km against the goal, days left and the explorer link for an active position", async () => {
     const harness = makeHarness({ scenario: "active" });

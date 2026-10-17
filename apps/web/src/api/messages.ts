@@ -1,4 +1,5 @@
 import { type AgentHabitErrorCode, isAgentHabitError } from "@agenthabit/core";
+import { isWebError, type WebErrorCode } from "../errors.js";
 import { isWalletError } from "../wallet/port.js";
 
 /**
@@ -49,10 +50,23 @@ const WALLET_MESSAGES = {
   WalletFailed: "Tu billetera no pudo completar la solicitud.",
 } as const;
 
+const WEB_MESSAGES: Record<WebErrorCode, string> = {
+  WeekChanged: "La semana cambió mientras confirmabas. Revisa las fechas y confirma de nuevo.",
+  ReleaseWeekMismatch:
+    "La transacción preparada no corresponde a la semana que elegiste. Actualiza la página e intenta de nuevo.",
+  CommitPending:
+    "Tienes una transacción en espera. Cuando se confirme, tu compromiso aparecerá aquí; no hace falta firmar de nuevo.",
+  ServerResponse: "El servidor no respondió bien. Intenta de nuevo en un minuto.",
+  WebConfig: "La web no está bien configurada. Avísale a quien te invitó.",
+};
+
 /** A sentence in Spanish for any failure the UI can meet. Never includes tokens or raw bodies. */
 export function messageFor(error: unknown): string {
   if (isWalletError(error)) {
     return WALLET_MESSAGES[error.code];
+  }
+  if (isWebError(error)) {
+    return WEB_MESSAGES[error.code];
   }
   if (isAgentHabitError(error)) {
     // ConfigError arrives as a 503: the service is up but not ready.

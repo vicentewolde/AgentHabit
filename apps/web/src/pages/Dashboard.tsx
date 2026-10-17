@@ -5,11 +5,14 @@ import { useApp } from "../app-context.js";
 import { CommitForm } from "../components/CommitForm.js";
 import { StravaCard } from "../components/StravaCard.js";
 import { UnsettledWeek } from "../components/UnsettledWeek.js";
-import { Button, Card, Loading, Notice } from "../components/ui.js";
+import { Button, Card, ExplorerLink, Loading, Notice } from "../components/ui.js";
 import { WeekCard } from "../components/WeekCard.js";
 import { reconcilePendingCommit } from "../flows.js";
+import type { PendingCommit } from "../pending.js";
 
 const RETRY_MS = 20_000;
+/** The clock on screen moves on its own: "Recuperar" must appear without a reload. */
+const TICK_MS = 30_000;
 
 interface Loaded {
   readonly config: ConfigResponse;
@@ -17,7 +20,8 @@ interface Loaded {
   readonly weeks: WeeksResponse;
   /** `Date.now()` when the answer arrived, to keep counting from the server's `now`. */
   readonly loadedAtMs: number;
-  readonly mirrorWaiting: boolean;
+  /** A signed commit of this wallet that is still waiting to be confirmed or recorded. */
+  readonly pending: PendingCommit | null;
 }
 
 type LoadState =
@@ -48,9 +52,15 @@ export function Dashboard() {
       const mine = ++latest.current;
       if (!quiet) setState({ kind: "loading" });
       try {
-        // A commit left over from an earlier attempt goes first, so the week shows it.
-        const reconciled = await reconcilePendingCommit({ api, address });
-        const [config, me, weeks] = await Promise.all([api.config(), api.me(), api.weeks()]);
+        // A commit left over from an earlier attempt is picked up in parallel with the reads.
+        const [reconciled, config, me, firstWeeks] = await Promise.all([
+          reconcilePendingCommit({ api, address }),
+          api.config(),
+          api.me(),
+          api.weeks(),
+        ]);
+        // If the leftover was just recorded, the weeks read above may predate it.
+        const weeks = reconciled.result === "mirrored" ? await api.weeks() : firstWeeks;
         if (mine !== latest.current) return;
         setState({
           kind: "ready",
@@ -59,7 +69,7 @@ export function Dashboard() {
             me,
             weeks,
             loadedAtMs: Date.now(),
-            mirrorWaiting: reconciled === "waiting",
+            pending: reconciled.pending,
           },
         });
       } catch (error) {
@@ -77,7 +87,15 @@ export function Dashboard() {
     };
   }, [load]);
 
-  // While a position is on-chain but unreported, ask again: the pending hash is retried on load.
+  // Tick the clock so time-gated parts (the release button, days left) update by themselves.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick((n) => n + 1), TICK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  // While a position is on-chain but unreported, or a signed commit is waiting, ask again: the
+  // stored commit is retried on every load.
   const unreported =
     state.kind === "ready" &&
     [
@@ -85,11 +103,12 @@ export function Dashboard() {
       state.data.weeks.nextWeek,
       ...state.data.weeks.unsettledWeeks,
     ].some((week) => week.position?.state === "Active" && week.position.commitTxHash === null);
+  const needsRetry = unreported || (state.kind === "ready" && state.data.pending !== null);
   useEffect(() => {
-    if (!unreported) return;
+    if (!needsRetry) return;
     const timer = window.setInterval(() => void load(true), RETRY_MS);
     return () => window.clearInterval(timer);
-  }, [unreported, load]);
+  }, [needsRetry, load]);
 
   if (state.kind === "loading") return <Loading label="Cargando tu semana…" />;
   if (state.kind === "error") {
@@ -101,19 +120,17 @@ export function Dashboard() {
     );
   }
 
-  const { config, me, weeks, loadedAtMs, mirrorWaiting } = state.data;
+  const { config, me, weeks, loadedAtMs, pending } = state.data;
   const instance = pickInstance(config, weeks);
   const nowMs = Date.parse(weeks.now) + (Date.now() - loadedAtMs);
   const reload = () => load(true);
+  const nextEmpty = weeks.nextWeek.position === null;
+  // A waiting transaction replaces the form: signing again could lock the money twice.
+  const showForm = committed || (nextEmpty && pending === null);
+  const showPending = !committed && nextEmpty && pending !== null;
 
   return (
     <div className="space-y-4">
-      {mirrorWaiting && (
-        <Notice tone="info">
-          Tu compromiso anterior ya fue enviado a la cadena, pero todavía no aparece aquí. Actualiza
-          la página en un minuto.
-        </Notice>
-      )}
       <StravaCard connected={me.stravaConnected} onChanged={reload} />
       <Card title="Esta semana" headingId="h-current">
         <WeekCard
@@ -139,7 +156,17 @@ export function Dashboard() {
         </Card>
       )}
       <Card title="La semana que viene" headingId="h-next">
-        {(weeks.nextWeek.position === null || committed) && (
+        {showPending && pending !== null && (
+          <Notice tone="info">
+            Tienes una transacción en espera: ya firmaste tu compromiso y estamos esperando que la
+            red lo confirme y que AgentHabit lo registre. No hace falta firmar de nuevo; esta página
+            lo vuelve a intentar sola.{" "}
+            {pending.txHash !== undefined && (
+              <ExplorerLink template={instance.explorerTxUrl} hash={pending.txHash} />
+            )}
+          </Notice>
+        )}
+        {showForm && (
           <CommitForm
             week={weeks.nextWeek}
             instance={instance}
@@ -149,6 +176,7 @@ export function Dashboard() {
               setCommitted(true);
               void reload();
             }}
+            onStale={() => void reload()}
           />
         )}
         {weeks.nextWeek.position !== null && (
